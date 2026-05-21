@@ -302,7 +302,7 @@ html, body {
    ========================================================= */
 .meter-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;   /* legacy 3-meter layout */
   align-items: center;
   width: 100%;
   max-width: 460px;
@@ -310,6 +310,11 @@ html, body {
   padding: 4px 4px 0;
   position: relative;
   margin-top: 6px;
+}
+/* Active 2-meter layout (pig raid + shield) — hammer meter removed in
+   v0.8 with the new tile roster. */
+.meter-row.meter-row-2 {
+  grid-template-columns: 1fr 1fr;
 }
 .meter-block {
   display: flex;
@@ -1986,13 +1991,9 @@ body.theme-matryoshka .theme-cell.active {
       </div>
     </div>
 
-    <!-- Meter row: 3 charge meters -->
-    <div class="meter-row">
-      <div class="meter-block hammer" id="meter-hammer">
-        <div class="booster-thumb hammer">🔨</div>
-        <div class="meter-bar"><div class="meter-fill" id="fill-hammer"></div></div>
-        <div class="meter-label" id="label-hammer">0/20</div>
-      </div>
+    <!-- Meter row: 2 charge meters (Pig raid + Shield). Hammer/smash
+         removed — Bolt tiles now grant energy directly instead. -->
+    <div class="meter-row meter-row-2">
       <div class="meter-block pig" id="meter-pig">
         <div class="booster-thumb pig">🐷</div>
         <div class="meter-bar"><div class="meter-fill" id="fill-pig"></div></div>
@@ -2131,13 +2132,30 @@ const VERSION = 'v0.4.0';
 const COLS = 6;
 const ROWS = 7;
 const MIN_MATCH = 3;
-const NUM_COLORS = 5;
-
-// Tile indexes
+// Tile roster — SAME structure across every theme:
+//   0-3 are "color" tiles (4-in-a-row spawns specials):
+//     COIN  — common gold        — base value 1
+//     SACK  — gold sack          — base value 2
+//     CHEST — treasure chest     — base value 4
+//     THEME — theme-specific     — base value 1.5  (e.g. pirate hat 💀)
+//   4-6 are RARE effect tiles (no special spawns from these):
+//     SHIELD — fills shield meter
+//     PIG    — fills raid meter
+//     BOLT   — grants energy directly per match
+//   7-8 are SPECIAL bonus drops:
+//     WILD   — matches any color
+//     STAR   — mega-bonus, fills all meters
+const NUM_COLORS = 4;
 const TILE = {
-  COLOR_0: 0, COLOR_1: 1, COLOR_2: 2, COLOR_3: 3, COLOR_4: 4,
-  HAMMER: 5, PIG: 6, SHIELD: 7,
-  MONEY_BAG: 8, WILD: 9, STAR: 10,
+  COIN:   0,
+  SACK:   1,
+  CHEST:  2,
+  THEME:  3,
+  SHIELD: 4,
+  PIG:    5,
+  BOLT:   6,
+  WILD:   7,
+  STAR:   8,
 };
 
 // Theme — Pirate Cove default. Tile palette: 5 treasure tiles.
@@ -2149,7 +2167,9 @@ const THEMES = {
     id: 'pirate',
     name: 'Pirate Cove',
     nameEmoji: '🏴‍☠️',
-    tiles: ['💎', '⚓', '🗡️', '💀', '🪙'],
+    // The THEME-tile emoji that appears on the grid for this theme.
+    // All other grid tiles (coin/sack/chest/shield/pig/bolt) are universal.
+    themeTileEmoji: '💀',
     structures: [
       { id: 'lighthouse', emoji: '🗼', name: 'Lighthouse',     base: 150,  x: 18, y: 64 },
       { id: 'dock',       emoji: '⛵', name: 'Pirate Dock',    base: 400,  x: 36, y: 56 },
@@ -2160,9 +2180,17 @@ const THEMES = {
   },
 };
 
+// Universal tile emojis (same across all themes). The THEME slot pulls
+// its emoji from the current theme's themeTileEmoji at render time.
 const TILE_EMOJI_FIXED = {
-  [TILE.HAMMER]: '🔨', [TILE.PIG]: '🐷', [TILE.SHIELD]: '🛡️',
-  [TILE.MONEY_BAG]: '💰', [TILE.WILD]: '🎰', [TILE.STAR]: '⭐',
+  [TILE.COIN]:   '🪙',
+  [TILE.SACK]:   '💰',
+  [TILE.CHEST]:  '🗝️',
+  [TILE.SHIELD]: '🛡️',
+  [TILE.PIG]:    '🐷',
+  [TILE.BOLT]:   '⚡',
+  [TILE.WILD]:   '🎰',
+  [TILE.STAR]:   '⭐',
 };
 
 // Special-piece types (ported verbatim from Match Icon).
@@ -2180,17 +2208,33 @@ function makeCell(type, sp, mod) {
   return { type, sp: sp || SP_NONE, mod: mod || null };
 }
 
+// Per-tile base value (multiplied by bet × cascade). Tiered for the 3
+// gold tiers so matching chests pays much more than matching coins.
 const TILE_VALUE = {
-  [TILE.COLOR_0]: 1.0, [TILE.COLOR_1]: 1.0, [TILE.COLOR_2]: 1.0,
-  [TILE.COLOR_3]: 1.0, [TILE.COLOR_4]: 1.0,
-  [TILE.HAMMER]: 1.0, [TILE.PIG]: 1.0, [TILE.SHIELD]: 1.0,
-  [TILE.MONEY_BAG]: 5.0, [TILE.WILD]: 1.0, [TILE.STAR]: 2.0,
+  [TILE.COIN]:   1.0,
+  [TILE.SACK]:   2.0,
+  [TILE.CHEST]:  4.0,
+  [TILE.THEME]:  1.5,
+  [TILE.SHIELD]: 1.0,
+  [TILE.PIG]:    1.0,
+  [TILE.BOLT]:   1.0,
+  [TILE.WILD]:   1.0,
+  [TILE.STAR]:   3.0,
 };
 
-const CHARGE_SPAWN_P = 0.10;
-const BAG_SPAWN_P    = 0.025;
-const WILD_SPAWN_P   = 0.008;
-const STAR_SPAWN_P   = 0.004;
+// Spawn weights — sum to 1. Common gold tiers + theme dominate; rare
+// effect tiles (shield/pig/bolt) are uncommon; wild/star are super rare.
+const SPAWN_RATE = {
+  STAR:   0.008,   // mega-bonus
+  WILD:   0.012,   // matches any
+  BOLT:   0.050,   // grants energy
+  PIG:    0.060,   // raid meter
+  SHIELD: 0.060,   // shield meter
+  CHEST:  0.080,   // high-value gold
+  SACK:   0.180,   // medium gold
+  COIN:   0.300,   // common gold
+  // THEME picks up the rest (~0.250)
+};
 
 const CASCADE_MULT = [1, 1, 1.5, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0];
 
@@ -2931,14 +2975,18 @@ function drawParticles() {
   ctx.globalAlpha = 1;
 }
 function tileParticleColor(tl) {
-  if (tl === TILE.HAMMER)    return '#ff8c3a';
-  if (tl === TILE.PIG)       return '#ff77a8';
-  if (tl === TILE.SHIELD)    return '#4fb2ff';
-  if (tl === TILE.MONEY_BAG) return '#ffd864';
-  if (tl === TILE.WILD)      return '#a263e8';
-  if (tl === TILE.STAR)      return '#fff4ad';
-  const cols = ['#ff5c7a', '#ffaf3a', '#4ad88a', '#4fb2ff', '#b878ff'];
-  return cols[tl] || '#ffffff';
+  // Effect / special tiles get their own signature color.
+  if (tl === TILE.SHIELD) return '#4fb2ff';   // blue
+  if (tl === TILE.PIG)    return '#ff77a8';   // pink
+  if (tl === TILE.BOLT)   return '#ffd864';   // electric yellow
+  if (tl === TILE.WILD)   return '#a263e8';   // purple
+  if (tl === TILE.STAR)   return '#fff4ad';   // pale gold
+  // 4 "color" tiers — gold spectrum + theme purple.
+  if (tl === TILE.COIN)   return '#ffd864';   // bright gold
+  if (tl === TILE.SACK)   return '#ff9a30';   // amber/orange
+  if (tl === TILE.CHEST)  return '#c9921a';   // deep gold
+  if (tl === TILE.THEME)  return '#b878ff';   // theme purple
+  return '#ffffff';
 }
 
 // Swipe trail dot — soft sparkle following the finger during drag.
@@ -3103,15 +3151,19 @@ function pickFreshTile(r, c) {
   return makeCell(Math.floor(Math.random() * NUM_COLORS));
 }
 function pickReplenishTile() {
+  // Walk the spawn table once. Anything that falls past CHEST defaults
+  // to the THEME tile (so theme spawns get the leftover ~25%).
   const r = Math.random();
   let acc = 0;
-  if (r < (acc += STAR_SPAWN_P))   return makeCell(TILE.STAR);
-  if (r < (acc += WILD_SPAWN_P))   return makeCell(TILE.WILD);
-  if (r < (acc += BAG_SPAWN_P))    return makeCell(TILE.MONEY_BAG);
-  if (r < (acc += CHARGE_SPAWN_P)) return makeCell(TILE.HAMMER);
-  if (r < (acc += CHARGE_SPAWN_P)) return makeCell(TILE.PIG);
-  if (r < (acc += CHARGE_SPAWN_P)) return makeCell(TILE.SHIELD);
-  return makeCell(Math.floor(Math.random() * NUM_COLORS));
+  if (r < (acc += SPAWN_RATE.STAR))   return makeCell(TILE.STAR);
+  if (r < (acc += SPAWN_RATE.WILD))   return makeCell(TILE.WILD);
+  if (r < (acc += SPAWN_RATE.BOLT))   return makeCell(TILE.BOLT);
+  if (r < (acc += SPAWN_RATE.PIG))    return makeCell(TILE.PIG);
+  if (r < (acc += SPAWN_RATE.SHIELD)) return makeCell(TILE.SHIELD);
+  if (r < (acc += SPAWN_RATE.CHEST))  return makeCell(TILE.CHEST);
+  if (r < (acc += SPAWN_RATE.SACK))   return makeCell(TILE.SACK);
+  if (r < (acc += SPAWN_RATE.COIN))   return makeCell(TILE.COIN);
+  return makeCell(TILE.THEME);
 }
 function tilesMatch(a, b) {
   if (!a || !b) return false;
@@ -3539,7 +3591,14 @@ function reshuffleGrid() {
 const game = { busy: false, selected: null, cascadeDepth: 0, cascadeMax: 0 };
 
 function tileEmoji(type) {
-  if (type < NUM_COLORS) return THEMES[state.theme].tiles[type];
+  // The THEME tile pulls its emoji from the current theme's themeTileEmoji
+  // so each island has one signature icon (pirate → 💀, desert → 🌵, etc.).
+  // Every other tile (coin/sack/chest/shield/pig/bolt/wild/star) uses the
+  // universal fixed-emoji table.
+  if (type === TILE.THEME) {
+    const th = THEMES[state.theme];
+    return (th && th.themeTileEmoji) || '?';
+  }
   return TILE_EMOJI_FIXED[type] || '?';
 }
 function effectiveBet() {
@@ -3818,7 +3877,8 @@ function scoreMatchedCells(cells) {
   const mult = CASCADE_MULT[Math.min(game.cascadeDepth, CASCADE_MULT.length - 1)];
   const bet = effectiveBet();
   let stepCoins = 0;
-  const chargeAdd = { hammer: 0, pig: 0, shield: 0 };
+  const chargeAdd = { pig: 0, shield: 0 };
+  let boltCount = 0;
   let starCount = 0;
   let orbCount = 0;
   for (const key of cells) {
@@ -3843,9 +3903,11 @@ function scoreMatchedCells(cells) {
       spawnTileTrail(c, r, color, orbCount * 35);
       orbCount++;
     }
-    if (type === TILE.HAMMER)      chargeAdd.hammer++;
-    else if (type === TILE.PIG)    chargeAdd.pig++;
+    // Rare effect tiles: PIG fills raid meter, SHIELD fills shield meter,
+    // BOLT grants energy directly (no meter), STAR mega-bonus.
+    if      (type === TILE.PIG)    chargeAdd.pig++;
     else if (type === TILE.SHIELD) chargeAdd.shield++;
+    else if (type === TILE.BOLT)   boltCount++;
     else if (type === TILE.STAR)   starCount++;
   }
   const chargeMult = Math.max(1, Math.floor(mult * 0.5 + bet.mult * 0.5));
@@ -3854,14 +3916,26 @@ function scoreMatchedCells(cells) {
   state.totalGoldEarnedEver += earnedInt;
   state.vaultLifetimeCoins += earnedInt;
   state.lastMatchGold = earnedInt;
-  state.meter.hammer = Math.min(METER_CAP, state.meter.hammer + chargeAdd.hammer * chargeMult);
   state.meter.pig    = Math.min(METER_CAP, state.meter.pig    + chargeAdd.pig    * chargeMult);
   state.meter.shield = Math.min(METER_CAP, state.meter.shield + chargeAdd.shield * chargeMult);
+  // Bolt tiles → energy. Each match gives 1 energy per tile × cascade mult,
+  // capped at energyMax. Players see the energy bar fill on the spot.
+  if (boltCount > 0) {
+    const energyGain = Math.max(1, Math.floor(boltCount * Math.max(1, mult)));
+    state.energy = Math.min(state.energyMax, state.energy + energyGain);
+    if (state.energy < state.energyMax && !state.energyRegenAt) {
+      state.energyRegenAt = Date.now() + ENERGY_REGEN_MS;
+    }
+    refreshEnergyUI();
+    sfxTone(880, 0.18, 0.10, 'triangle');  // sparkle chime per bolt match
+  }
   if (starCount > 0) {
-    const burst = 5 * starCount;
-    state.meter.hammer = Math.min(METER_CAP, state.meter.hammer + burst);
+    // Mega-bonus: fill both meters AND give extra energy + gold.
+    const burst = 6 * starCount;
     state.meter.pig    = Math.min(METER_CAP, state.meter.pig    + burst);
     state.meter.shield = Math.min(METER_CAP, state.meter.shield + burst);
+    state.energy = Math.min(state.energyMax, state.energy + 3 * starCount);
+    refreshEnergyUI();
   }
   sfxMatchPop(game.cascadeDepth);
   if (game.cascadeDepth === 1)      haptic('tap');
@@ -5314,8 +5388,10 @@ function refreshBoosterCounts() {
   });
 }
 function refreshMetersUI() {
-  for (const k of ['hammer', 'pig', 'shield']) {
-    const v = state.meter[k];
+  // Hammer meter dropped in v0.8 — bolt tiles now grant energy directly.
+  // Only pig (raid) and shield meters remain.
+  for (const k of ['pig', 'shield']) {
+    const v = state.meter[k] || 0;
     const fill = document.getElementById('fill-' + k);
     const lbl = document.getElementById('label-' + k);
     const block = document.getElementById('meter-' + k);
@@ -5325,7 +5401,6 @@ function refreshMetersUI() {
       if (v >= METER_CAP) { lbl.textContent = 'TAP!'; lbl.classList.add('full'); }
       else                { lbl.textContent = v + '/' + METER_CAP; lbl.classList.remove('full'); }
     }
-    // Booster-thumb pulses near and at charge
     const thumb = block && block.querySelector('.booster-thumb');
     if (thumb) {
       thumb.classList.toggle('charged', v >= METER_CAP);
@@ -5770,9 +5845,7 @@ function finishRaid(masterId, totalGold, perfect) {
   }, 600);
 }
 
-document.getElementById('meter-hammer').addEventListener('click', () => {
-  if (state.meter.hammer >= METER_CAP) startSmash();
-});
+// meter-hammer/smash event removed in v0.8 — bolt tiles handle energy now.
 document.getElementById('meter-pig').addEventListener('click', () => {
   if (state.meter.pig >= METER_CAP) startRaid();
 });
@@ -5999,9 +6072,8 @@ function showAdminModal() {
     '<h2>🛠 ADMIN CHEATS</h2>' +
     '<div class="sub">TG ID 23040617 · Pickle only</div>' +
     '<div class="admin-grid">' +
-      '<button class="btn red" id="ck-smash">🔨 FORCE SMASH</button>' +
       '<button class="btn red" id="ck-raid">🐷 FORCE RAID</button>' +
-      '<button class="btn gold" id="ck-fillmeters">🔋 FILL ALL METERS</button>' +
+      '<button class="btn gold" id="ck-fillmeters">🔋 FILL PIG + SHIELD METERS</button>' +
       '<button class="btn gold" id="ck-gold">💰 +10K GOLD</button>' +
       '<button class="btn ghost" id="ck-shield">🛡 +1 SHIELD</button>' +
       '<button class="btn ghost" id="ck-energy">⚡ REFILL ENERGY</button>' +
@@ -6011,12 +6083,6 @@ function showAdminModal() {
       '<button class="btn ghost full" id="ck-reset">🔄 RESET LOCAL SAVE</button>' +
     '</div>';
   openModal(html);
-  document.getElementById('ck-smash').addEventListener('click', () => {
-    state.meter.hammer = METER_CAP;
-    refreshMetersUI();
-    closeModal();
-    setTimeout(startSmash, 200);
-  });
   document.getElementById('ck-raid').addEventListener('click', () => {
     state.meter.pig = METER_CAP;
     refreshMetersUI();
@@ -6024,11 +6090,10 @@ function showAdminModal() {
     setTimeout(startRaid, 200);
   });
   document.getElementById('ck-fillmeters').addEventListener('click', () => {
-    state.meter.hammer = METER_CAP;
     state.meter.pig    = METER_CAP;
     state.meter.shield = METER_CAP;
     saveState(); refreshAllUI();
-    toast('All meters filled');
+    toast('Meters filled');
     closeModal();
   });
   document.getElementById('ck-gold').addEventListener('click', () => {
