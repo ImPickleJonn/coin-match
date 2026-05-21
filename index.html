@@ -5237,12 +5237,15 @@ function render() {
   ctx.save();
   ctx.translate(off.x, off.y);
 
-  // Backdrop
-  ctx.fillStyle = '#0e0820';
+  // Backdrop — kawaii cream gradient instead of dark purple
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, cssH);
+  bgGrad.addColorStop(0, '#fff8e8');
+  bgGrad.addColorStop(1, '#ffe6c8');
+  ctx.fillStyle = bgGrad;
   ctx.fillRect(-20, -20, cssW + 40, cssH + 40);
 
-  // Subtle grid lines
-  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  // Subtle warm grid lines — dotted brown so it reads as paper/board ruling
+  ctx.strokeStyle = 'rgba(74, 36, 18, 0.07)';
   ctx.lineWidth = 1;
   for (let c = 1; c < COLS; c++) {
     ctx.beginPath();
