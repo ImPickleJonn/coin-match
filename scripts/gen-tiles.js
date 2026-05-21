@@ -136,6 +136,62 @@ const TILES = [
     filename: '06_cute_attack_glove.png',
     subject: `A red boxing glove, viewed from the front (knuckles facing the viewer). Bright red/pink gradient body, a white wrist cuff at the bottom with two thin dark stripes, and three small knuckle dimples on the front. Glossy highlight on the upper-left.`,
   },
+
+  // ===== TILE SPECIALS (WILD + STAR) =====
+  {
+    id: 'wild',
+    filename: '08_tile_wild.png',
+    subject: `A colorful rainbow swirl gemstone (or 4-color pinwheel star) representing a "wild" / "rainbow" tile in a match-3 game. Round shape, with 4 distinct quadrants in bright candy colors: red, blue, yellow, green. Sparkle highlight in the center. Glossy 3D feel.`,
+  },
+  {
+    id: 'star',
+    filename: '09_tile_star.png',
+    subject: `A chunky cartoon 5-point star, bright golden yellow gradient (light yellow on top fading to gold-orange at bottom). Round chunky toon proportions (NOT a thin pointed star — fat, friendly, kawaii). Glossy white highlight on upper-left.`,
+  },
+
+  // ===== BOOSTERS (right side of grid) =====
+  {
+    id: 'booster_hammer',
+    filename: '11_booster_hammer.png',
+    subject: `A cute cartoon hammer tool, head pointing diagonally upper-right, handle pointing diagonally lower-left. Bright steel-gray hammer head with a tiny yellow lightning bolt or "POW" sparkle on top. Warm wooden brown handle with a wrap grip in red. Chunky toon proportions.`,
+  },
+  {
+    id: 'booster_rocket',
+    filename: '12_booster_rocket.png',
+    subject: `A cute cartoon rocket / firework, pointing straight up. Bright red main body with a white-and-blue striped fin section at the bottom, a yellow nose cone on top, and a tiny window/porthole in the middle. Small orange flame puff at the base.`,
+  },
+  {
+    id: 'booster_bomb',
+    filename: '13_booster_bomb.png',
+    subject: `A cute cartoon round bomb. Dark gray/black sphere body, a small lit fuse sticking out the top with a single bright orange-yellow spark at the fuse tip. Glossy highlight on the upper-left of the sphere. Chunky and friendly, not scary.`,
+  },
+  {
+    id: 'booster_shuffle',
+    filename: '14_booster_shuffle.png',
+    subject: `Two circular arrows forming a "refresh" or "shuffle" loop — one arrow curving clockwise on top, another curving counter-clockwise on the bottom, together forming a near-circle with arrow tips. Bright cyan-blue gradient. Friendly chunky cartoon style.`,
+  },
+
+  // ===== BOTTOM NAV TABS =====
+  {
+    id: 'nav_village',
+    filename: '21_nav_village.png',
+    subject: `A cute cartoon house with a red triangular roof, cream walls, a brown wooden door in the center, and one square window. Tiny puff of smoke from a small chimney. Chunky kawaii proportions.`,
+  },
+  {
+    id: 'nav_play',
+    filename: '22_nav_play.png',
+    subject: `A cute cartoon arcade slot-machine handle / play button — a yellow gold triangular play arrow (▶) inside a round bright pink button with a darker pink rim. Glossy highlight upper-left. Chunky and bouncy.`,
+  },
+  {
+    id: 'nav_shop',
+    filename: '23_nav_shop.png',
+    subject: `A cute cartoon shopping bag with two short handles at the top. Bright orange-yellow gradient body, a small pink heart emblem on the front of the bag. Chunky and friendly.`,
+  },
+  {
+    id: 'nav_friends',
+    filename: '24_nav_friends.png',
+    subject: `Two cute cartoon character heads side-by-side, slightly overlapping (the back one half-hidden by the front one). Front character: round pink head with a smile. Back character: round blue head with a smile. Simple, no facial details beyond a small smile and dot eyes. Chunky kawaii proportions.`,
+  },
 ];
 
 // ----- Decode any incoming image to RGBA pixel data + width/height.
