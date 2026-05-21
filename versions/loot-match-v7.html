@@ -2352,7 +2352,7 @@ const defaultState = () => ({
   armed: { hammer: false, rocket: false, bomb: false },
   freeSpinsLeft: 0,
   muted: false,
-  uiTheme: 'matryoshka',    // default = bright cute AAA palette. 'dark' = original Match Icon
+  uiTheme: 'dark',          // visual palette: 'dark' (Match Icon) | 'matryoshka' (bright red/cream/gold)
   streak: 0,
   dailyChestYMD: '',
   dailyChestDay: 0,
@@ -2517,7 +2517,7 @@ const UI_THEMES = [
   { id: 'matryoshka', name: 'Matryoshka',  emoji: '🪆', sub: 'Bright red & gold' },
 ];
 function applyTheme() {
-  const id = state.uiTheme || 'matryoshka';
+  const id = state.uiTheme || 'dark';
   document.body.classList.remove('theme-dark', 'theme-matryoshka');
   document.body.classList.add('theme-' + id);
 }
@@ -6498,7 +6498,7 @@ function showSettingsModal() {
   if (tgrid) {
     for (const th of UI_THEMES) {
       const cell = document.createElement('div');
-      cell.className = 'theme-cell' + (th.id === (state.uiTheme || 'matryoshka') ? ' active' : '');
+      cell.className = 'theme-cell' + (th.id === (state.uiTheme || 'dark') ? ' active' : '');
       cell.innerHTML = '<span class="em">' + th.emoji + '</span>' +
                        '<div>' + th.name + '</div>' +
                        '<div style="font-size:9px;opacity:0.7;font-weight:700;margin-top:2px;">' + th.sub + '</div>';
