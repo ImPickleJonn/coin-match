@@ -411,16 +411,47 @@ canvas {
   touch-action: none;
   box-shadow: 0 6px 20px rgba(0,0,0,0.5), inset 0 0 0 1px #3a2a6a;
 }
-#boardWrap {
-  position: relative;
-  margin-top: 4px;
-  /* Match Icon does NOT flex-grab leftover space — the canvas sizes
-     itself from the formula and the wrap fits the canvas. Any leftover
-     vertical space gets absorbed by action-bar's margin-top: auto. */
-  width: 100%;
+/* Board ROW: canvas on the left, vertical booster column on the right.
+   The row absorbs leftover vertical space so content drops to fill the
+   screen instead of stacking at the top. */
+.board-row {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  margin-top: 4px;
+  padding: 0 4px;
+}
+#boardWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 1;
+  min-width: 0;
+}
+/* Vertical booster stack on the right of the grid — replaces the old
+   horizontal action bar below the energy bar. Doesn't fight with the
+   canvas; canvas just gets a slightly tighter maxW in sizeCanvas. */
+.action-bar-side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+  align-items: center;
+  align-self: center;
+}
+.action-bar-side .action-btn {
+  width: 44px; height: 44px;
+  font-size: 19px;
+  border-radius: 9px;
+}
+.action-bar-side .action-btn .count {
+  top: -2px; right: -2px;
+  font-size: 9px;
 }
 .float-layer {
   position: absolute;
@@ -496,36 +527,69 @@ canvas {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 10px;
+  padding: 4px 8px;
   background: #1a1230;
-  border-radius: 12px;
+  border-radius: 14px;
   border: 2px solid #3a2a6a;
   box-shadow: 0 3px 10px rgba(0,0,0,0.45);
   font-size: 12px;
   font-weight: 800;
 }
-.energy-icon { font-size: 16px; line-height: 1; }
+/* Bar OUTER: positioned wrapper so we can overlay the bolt icon at the
+   start and the "N/Max" text in the center. The bar itself rounds far
+   enough that the bolt sits on top of it without visual clash. */
+.energy-bar-outer {
+  position: relative;
+  flex: 1;
+  height: 30px;
+  display: flex;
+  align-items: center;
+}
+.energy-bolt {
+  position: absolute;
+  left: -2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px; height: 34px;
+  background: linear-gradient(135deg, #ffd864 0%, #ff9a30 70%, #ff6a3e 100%);
+  border: 2.5px solid #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  z-index: 3;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.25) inset;
+}
 .energy-bar {
   flex: 1;
-  height: 12px;
+  height: 26px;
   background: #2a1f50;
-  border-radius: 6px;
+  border-radius: 999px;
   overflow: hidden;
   border: 1.5px solid #3a2a6a;
+  position: relative;
 }
 .energy-fill {
   height: 100%;
   background: linear-gradient(90deg, #4f8cff, #6aa0ff, #ffd864);
   transition: width 300ms ease;
-  box-shadow: 0 0 6px rgba(79,140,255,0.5);
+  box-shadow: 0 0 8px rgba(79,140,255,0.5);
 }
-.energy-num {
-  color: #ffd864;
+.energy-text {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  color: #fff;
+  font-weight: 900;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.85), 0 0 4px rgba(0,0,0,0.6);
+  z-index: 2;
+  pointer-events: none;
   font-variant-numeric: tabular-nums;
-  min-width: 46px;
-  text-align: right;
 }
-.energy-wrap.empty .energy-num { color: #ff3b7a; }
+.energy-wrap.empty .energy-text { color: #ffc4d0; }
 .energy-wrap.empty .energy-fill { background: #ff3b7a; }
 .energy-timer {
   color: #8a8ca0;
@@ -1933,29 +1997,34 @@ body.theme-matryoshka .theme-cell.active {
       </div>
     </div>
 
-    <!-- Board canvas -->
-    <div id="boardWrap">
-      <canvas id="board"></canvas>
-      <div class="float-layer" id="floatLayer"></div>
+    <!-- Board ROW: canvas on the left, vertical booster stack on the right.
+         The row absorbs leftover vertical space so the layout fills
+         instead of stacking at the top. -->
+    <div class="board-row">
+      <div id="boardWrap">
+        <canvas id="board"></canvas>
+        <div class="float-layer" id="floatLayer"></div>
+      </div>
+      <div class="action-bar-side">
+        <div class="action-btn" id="b-hammer">🔨<span class="count" id="cnt-hammer">0</span></div>
+        <div class="action-btn" id="b-rocket">🚀<span class="count" id="cnt-rocket">0</span></div>
+        <div class="action-btn" id="b-bomb">💣<span class="count" id="cnt-bomb">0</span></div>
+        <div class="action-btn" id="b-shuffle">🔄<span class="count" id="cnt-shuffle">0</span></div>
+      </div>
     </div>
 
-    <!-- Energy bar (below grid) -->
+    <!-- Energy bar — thicker, with the ⚡ bolt OVERLAID at the start
+         and "N/Max" text centered inside the fill. -->
     <div class="energy-wrap" id="energy-wrap">
-      <div class="energy-icon">⚡</div>
-      <div class="energy-bar"><div class="energy-fill" id="energy-fill"></div></div>
-      <div class="energy-num"><span id="energy-num">30</span>/<span id="energy-max">30</span></div>
+      <div class="energy-bar-outer">
+        <div class="energy-bolt">⚡</div>
+        <div class="energy-bar">
+          <div class="energy-fill" id="energy-fill"></div>
+          <div class="energy-text"><span id="energy-num">30</span>/<span id="energy-max">30</span></div>
+        </div>
+      </div>
       <div class="energy-timer" id="energy-timer"></div>
       <div class="bet-btn" id="bet-btn"><span data-i18n="bet">BET</span><span class="x" id="bet-x">×1</span></div>
-    </div>
-
-    <!-- Action bar — boosters + DAILY button center -->
-    <div class="action-bar">
-      <!-- 4 booster buttons grouped together in the center, no daily button.
-           Daily auto-opens on first launch of the day. -->
-      <div class="action-btn" id="b-hammer">🔨<span class="count" id="cnt-hammer">0</span></div>
-      <div class="action-btn" id="b-rocket">🚀<span class="count" id="cnt-rocket">0</span></div>
-      <div class="action-btn" id="b-bomb">💣<span class="count" id="cnt-bomb">0</span></div>
-      <div class="action-btn" id="b-shuffle">🔄<span class="count" id="cnt-shuffle">0</span></div>
     </div>
 
   </div>
@@ -2917,11 +2986,13 @@ function tick(t) {
 
 function sizeCanvas() {
   // Match Icon's canonical formula: maxH = innerHeight - 220. Coin Match
-  // has slightly more HUD (gold-strip + energy bar adds ~70px), so we
-  // reserve 290px. Plus a hard CELL cap so the grid never balloons on
-  // tall phones — feels visually proportional regardless of viewport.
-  const maxW = Math.min(window.innerWidth - 12, 460);
-  const maxH = Math.max(220, window.innerHeight - 290);
+  // has slightly more HUD (gold-strip + energy bar adds ~70px) PLUS a
+  // vertical booster column on the right of the grid (~54px wide), so
+  // we subtract that from maxW too. Plus a hard CELL cap so the grid
+  // never balloons on tall phones.
+  const SIDE_BOOSTERS_W = 54;   // 44px button + 6px gap + 4px padding
+  const maxW = Math.min(window.innerWidth - 12 - SIDE_BOOSTERS_W, 460);
+  const maxH = Math.max(220, window.innerHeight - 250);
   const MAX_CELL = 56;
   CELL = Math.max(34, Math.min(MAX_CELL, Math.floor(Math.min(maxW / COLS, maxH / ROWS))));
   DPR = Math.min(2, window.devicePixelRatio || 1);
