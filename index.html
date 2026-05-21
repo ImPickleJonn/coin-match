@@ -32,6 +32,36 @@ html, body {
   z-index: 500;
   pointer-events: none;
 }
+
+/* Admin cheat button — only shown for Pickle's TG ID (or local-dev).
+   Fixed-position discreet red badge in the top-left corner. */
+#admin-btn {
+  position: fixed;
+  top: calc(var(--tg-safe-top, 0px) + 6px);
+  left: 6px;
+  width: 28px; height: 28px;
+  background: linear-gradient(135deg, #ff5c7a, #c8344f);
+  border: 2px solid #fff;
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 900;
+  z-index: 600;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.55);
+  opacity: 0.72;
+}
+#admin-btn:hover { opacity: 1; }
+#admin-btn:active { transform: scale(0.92); }
+.admin-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 8px 0;
+}
+.admin-grid .btn { padding: 11px 8px; font-size: 12px; letter-spacing: 0.5px; }
+.admin-grid .btn.full { grid-column: 1 / -1; }
 .app {
   display: flex;
   flex-direction: column;
@@ -1410,6 +1440,10 @@ canvas {
 <body>
 
 <div id="safeAreaBar"></div>
+
+<!-- Admin hamburger — fixed top-left, hidden unless TG user id 23040617
+     (or local-dev with no initData). Opens cheat menu. -->
+<div id="admin-btn" style="display:none;" title="Admin">☰</div>
 
 <!-- ============ PLAY SCREEN ============ -->
 <div id="screen-play" class="screen active">
@@ -5324,6 +5358,112 @@ document.getElementById('rules-btn').addEventListener('click', showDailyModal);
 // Master avatar long-press = settings (placeholder for v0.4)
 document.getElementById('playerAv').addEventListener('click', showSettingsModal);
 
+// =========================================================
+// Admin cheats — visible only for Pickle's TG ID (23040617)
+// or in local-dev with no Telegram initData. Lets admin force
+// SMASH / RAID / shield / energy / gold without the natural gate.
+// =========================================================
+const ADMIN_TG_ID = 23040617;
+function isPickleAdmin() {
+  if (!TG || !TG.initData) return true;  // local dev — always admin
+  const u = TG.initDataUnsafe && TG.initDataUnsafe.user;
+  return !!(u && u.id === ADMIN_TG_ID);
+}
+function showAdminModal() {
+  const html =
+    '<h2>🛠 ADMIN CHEATS</h2>' +
+    '<div class="sub">TG ID 23040617 · Pickle only</div>' +
+    '<div class="admin-grid">' +
+      '<button class="btn red" id="ck-smash">🔨 FORCE SMASH</button>' +
+      '<button class="btn red" id="ck-raid">🐷 FORCE RAID</button>' +
+      '<button class="btn gold" id="ck-fillmeters">🔋 FILL ALL METERS</button>' +
+      '<button class="btn gold" id="ck-gold">💰 +10K GOLD</button>' +
+      '<button class="btn ghost" id="ck-shield">🛡 +1 SHIELD</button>' +
+      '<button class="btn ghost" id="ck-energy">⚡ REFILL ENERGY</button>' +
+      '<button class="btn ghost full" id="ck-boosters">🎁 +5 OF EACH BOOSTER</button>' +
+      '<button class="btn ghost full" id="ck-spawnspecial">✨ SEED A SPECIAL TILE</button>' +
+      '<button class="btn ghost full" id="ck-reset">🔄 RESET LOCAL SAVE</button>' +
+    '</div>';
+  openModal(html);
+  document.getElementById('ck-smash').addEventListener('click', () => {
+    state.meter.hammer = METER_CAP;
+    refreshMetersUI();
+    closeModal();
+    setTimeout(startSmash, 200);
+  });
+  document.getElementById('ck-raid').addEventListener('click', () => {
+    state.meter.pig = METER_CAP;
+    refreshMetersUI();
+    closeModal();
+    setTimeout(startRaid, 200);
+  });
+  document.getElementById('ck-fillmeters').addEventListener('click', () => {
+    state.meter.hammer = METER_CAP;
+    state.meter.pig    = METER_CAP;
+    state.meter.shield = METER_CAP;
+    saveState(); refreshAllUI();
+    toast('All meters filled');
+    closeModal();
+  });
+  document.getElementById('ck-gold').addEventListener('click', () => {
+    state.coins += 10000;
+    state.totalGoldEarnedEver += 10000;
+    state.vaultLifetimeCoins += 10000;
+    bumpScore();
+    saveState(); refreshAllUI();
+    toast('+10,000 💰');
+    closeModal();
+  });
+  document.getElementById('ck-shield').addEventListener('click', () => {
+    state.shieldsStocked = Math.min(3, state.shieldsStocked + 1);
+    saveState(); refreshAllUI();
+    toast('+1 🛡 (' + state.shieldsStocked + ' total)');
+    closeModal();
+  });
+  document.getElementById('ck-energy').addEventListener('click', () => {
+    state.energy = state.energyMax;
+    state.energyRegenAt = 0;
+    saveState(); refreshAllUI();
+    toast('⚡ Refilled');
+    closeModal();
+  });
+  document.getElementById('ck-boosters').addEventListener('click', () => {
+    state.boost.hammer  += 5;
+    state.boost.rocket  += 5;
+    state.boost.bomb    += 5;
+    state.boost.shuffle += 5;
+    saveState(); refreshAllUI();
+    toast('+5 each booster');
+    closeModal();
+  });
+  document.getElementById('ck-spawnspecial').addEventListener('click', () => {
+    // Drop a random special on a random color tile so we can test detonations
+    const sps = [SP_ARROW_H, SP_ARROW_V, SP_BOMB, SP_LIGHTNING];
+    const sp = sps[Math.floor(Math.random() * sps.length)];
+    let placed = false;
+    for (let tries = 0; tries < 50 && !placed; tries++) {
+      const r = Math.floor(Math.random() * ROWS);
+      const c = Math.floor(Math.random() * COLS);
+      const cell = grid[r][c];
+      if (cell && cell.type < NUM_COLORS && !cell.sp) {
+        grid[r][c] = makeCell(cell.type, sp);
+        placed = true;
+      }
+    }
+    toast('Seeded: ' + (sp === SP_ARROW_H ? '↔' : sp === SP_ARROW_V ? '↕' : sp === SP_BOMB ? '💣' : '⚡'));
+    closeModal();
+  });
+  document.getElementById('ck-reset').addEventListener('click', () => {
+    if (!confirm('Reset local save? This wipes coins, village, meters, everything.')) return;
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem('loot-match-save-v3');
+    localStorage.removeItem('loot-match-save-v2');
+    localStorage.removeItem('loot-match-save-v1');
+    location.reload();
+  });
+}
+document.getElementById('admin-btn').addEventListener('click', showAdminModal);
+
 /* =========================================================
    [39] Shop + leaderboard
    ========================================================= */
@@ -5406,6 +5546,12 @@ function toast(msg) {
 (async function boot() {
   tgReady();
   applyI18n();
+  // Reveal the admin cheats button only for Pickle (TG ID 23040617)
+  // or in local-dev (no Telegram init data).
+  if (isPickleAdmin()) {
+    const ab = document.getElementById('admin-btn');
+    if (ab) ab.style.display = 'flex';
+  }
   pruneOldMasterDamage();
   spawnFreshGrid();
   sizeCanvas();
