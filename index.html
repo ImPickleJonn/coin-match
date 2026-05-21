@@ -483,7 +483,10 @@ canvas {
 
 /* Full-screen overlay canvas for the coin-shower particle system.
    No CSS animations — particles are drawn per frame in the existing
-   rAF loop. Cheap: one DOM node, one context, batched draws. */
+   rAF loop. Cheap: one DOM node, one context, batched draws.
+   IMPORTANT: explicitly override the global `canvas { background }`
+   rule + the theme-matryoshka canvas rule — both would otherwise
+   paint this fullscreen overlay opaque and hide the board. */
 .coin-fx-canvas {
   position: fixed;
   inset: 0;
@@ -491,6 +494,13 @@ canvas {
   height: 100vh;
   pointer-events: none;
   z-index: 95;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+body.theme-matryoshka .coin-fx-canvas {
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 /* Coin sprite that flies from a matched cell into the gold counter.
