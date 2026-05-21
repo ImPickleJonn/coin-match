@@ -224,18 +224,33 @@ html, body {
   min-height: 16px;
   text-align: center;
 }
-.last-match .v { color: #ffd864; font-weight: 900; }
+.last-match .v {
+  display: inline-block;
+  color: #ffd864;
+  font-weight: 900;
+  /* Pop-in each time refreshLastMatch rebuilds innerHTML (per cascade step). */
+  animation: cascadePop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
 .last-match .cascade {
+  display: inline-block;
   background: linear-gradient(90deg, #ff3b7a, #ffd864, #a263e8, #4f8cff, #ff3b7a);
   background-size: 200% 100%;
   -webkit-background-clip: text; background-clip: text;
   color: transparent;
-  animation: cascadeShift 1.4s linear infinite;
+  /* Infinite rainbow shift + one-shot scale pop on each step. */
+  animation:
+    cascadeShift 1.4s linear infinite,
+    cascadePop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
   font-weight: 900;
 }
 @keyframes cascadeShift {
   from { background-position: 0% 0; }
   to   { background-position: 100% 0; }
+}
+@keyframes cascadePop {
+  0%   { transform: scale(0.4); opacity: 0; }
+  55%  { transform: scale(1.25); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 /* =========================================================
