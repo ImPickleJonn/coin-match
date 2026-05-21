@@ -236,11 +236,11 @@ html, body {
   pointer-events: none;
 }
 .score-half {
-  padding: 10px 26px;
-  font-size: 30px;
+  padding: 7px 18px;
+  font-size: 24px;
   font-weight: 900;
   color: #fff;
-  min-width: 96px;
+  min-width: 72px;
   text-align: center;
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -411,19 +411,23 @@ canvas {
   touch-action: none;
   box-shadow: 0 6px 20px rgba(0,0,0,0.5), inset 0 0 0 1px #3a2a6a;
 }
-/* Board ROW: canvas on the left, vertical booster column on the right.
-   The row absorbs leftover vertical space so content drops to fill the
-   screen instead of stacking at the top. */
+/* Board ROW: [left-spacer][canvas][booster column]. The spacer matches
+   the booster column's width so the canvas appears visually centered
+   on the screen — without the booster column shoving it left.
+   No flex:1 — content stacks naturally so the meter row stays right
+   above the grid, not separated by an absorbed-leftover gap. */
 .board-row {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 4px;
   width: 100%;
-  flex: 1;
-  min-height: 0;
   margin-top: 4px;
   padding: 0 4px;
+}
+.action-bar-spacer {
+  width: 44px;
+  flex-shrink: 0;
 }
 #boardWrap {
   position: relative;
@@ -433,25 +437,28 @@ canvas {
   flex-shrink: 1;
   min-width: 0;
 }
-/* Vertical booster stack on the right of the grid — replaces the old
-   horizontal action bar below the energy bar. Doesn't fight with the
-   canvas; canvas just gets a slightly tighter maxW in sizeCanvas. */
 .action-bar-side {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  width: 44px;
   flex-shrink: 0;
-  align-items: center;
-  align-self: center;
 }
 .action-bar-side .action-btn {
-  width: 44px; height: 44px;
-  font-size: 19px;
+  width: 40px; height: 40px;
+  font-size: 18px;
   border-radius: 9px;
 }
 .action-bar-side .action-btn .count {
   top: -2px; right: -2px;
   font-size: 9px;
+}
+/* Spacer at the bottom of .app that absorbs any leftover vertical
+   space. Keeps the energy bar from sitting flush with the nav, and
+   keeps content tight at the top (meter row stays right above grid). */
+.app-spacer {
+  flex: 1;
+  min-height: 12px;
 }
 .float-layer {
   position: absolute;
@@ -524,6 +531,7 @@ canvas {
   width: 100%;
   max-width: 460px;
   margin-top: 6px;
+  margin-bottom: 10px;   /* clearance from the bottom-nav */
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1997,10 +2005,11 @@ body.theme-matryoshka .theme-cell.active {
       </div>
     </div>
 
-    <!-- Board ROW: canvas on the left, vertical booster stack on the right.
-         The row absorbs leftover vertical space so the layout fills
-         instead of stacking at the top. -->
+    <!-- Board ROW: [left-spacer][canvas][booster column].
+         The left spacer matches the right booster column's width so
+         the canvas is visually centered on the screen. -->
     <div class="board-row">
+      <div class="action-bar-spacer"></div>
       <div id="boardWrap">
         <canvas id="board"></canvas>
         <div class="float-layer" id="floatLayer"></div>
@@ -2026,6 +2035,10 @@ body.theme-matryoshka .theme-cell.active {
       <div class="energy-timer" id="energy-timer"></div>
       <div class="bet-btn" id="bet-btn"><span data-i18n="bet">BET</span><span class="x" id="bet-x">×1</span></div>
     </div>
+
+    <!-- Absorbs leftover vertical space so the energy bar isn't flush
+         with the nav. Content above stacks tight (meter→grid). -->
+    <div class="app-spacer"></div>
 
   </div>
 </div>
@@ -2985,16 +2998,15 @@ function tick(t) {
 }
 
 function sizeCanvas() {
-  // Match Icon's canonical formula: maxH = innerHeight - 220. Coin Match
-  // has slightly more HUD (gold-strip + energy bar adds ~70px) PLUS a
-  // vertical booster column on the right of the grid (~54px wide), so
-  // we subtract that from maxW too. Plus a hard CELL cap so the grid
-  // never balloons on tall phones.
-  const SIDE_BOOSTERS_W = 54;   // 44px button + 6px gap + 4px padding
-  const maxW = Math.min(window.innerWidth - 12 - SIDE_BOOSTERS_W, 460);
-  const maxH = Math.max(220, window.innerHeight - 250);
-  const MAX_CELL = 56;
-  CELL = Math.max(34, Math.min(MAX_CELL, Math.floor(Math.min(maxW / COLS, maxH / ROWS))));
+  // Board row layout: [left-spacer 44][gap 4][canvas][gap 4][booster 44].
+  // To keep the canvas visually centered on the screen, we subtract the
+  // FULL row chrome (both 44px columns + gaps + board-row padding).
+  // The CELL cap keeps the grid from looking oversized on tall phones.
+  const ROW_CHROME = 44 + 4 + 4 + 44 + 8;   // L-spacer + gaps + R-boosters + padding
+  const maxW = Math.min(window.innerWidth - 12 - ROW_CHROME, 460);
+  const maxH = Math.max(220, window.innerHeight - 270);
+  const MAX_CELL = 52;
+  CELL = Math.max(32, Math.min(MAX_CELL, Math.floor(Math.min(maxW / COLS, maxH / ROWS))));
   DPR = Math.min(2, window.devicePixelRatio || 1);
   canvas.style.width  = (CELL * COLS) + 'px';
   canvas.style.height = (CELL * ROWS) + 'px';
