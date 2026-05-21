@@ -805,24 +805,102 @@ canvas {
   0%   { transform: translateX(0); }
   100% { transform: translateX(-200vw); }
 }
+/* Three stacked wave lines drifting at different speeds — gives depth. */
 .scene .waves {
   position: absolute;
-  top: 52%; left: -10%;
+  left: -10%;
   width: 130%;
-  height: 6px;
-  background:
-    repeating-linear-gradient(90deg,
-      rgba(255,255,255,0.7) 0px,
-      rgba(255,255,255,0.7) 4px,
-      transparent 4px,
-      transparent 14px);
-  opacity: 0.45;
-  animation: waveSlide 5s linear infinite;
+  height: 5px;
+  opacity: 0.55;
   pointer-events: none;
 }
-@keyframes waveSlide {
-  0%   { transform: translateX(0); }
-  100% { transform: translateX(-18px); }
+.scene .wave-1 {
+  top: 48%;
+  background: repeating-linear-gradient(90deg,
+    rgba(255,255,255,0.8) 0, rgba(255,255,255,0.8) 3px,
+    transparent 3px, transparent 22px);
+  animation: waveSlide 6s linear infinite;
+}
+.scene .wave-2 {
+  top: 51%;
+  background: repeating-linear-gradient(90deg,
+    rgba(255,255,255,0.65) 0, rgba(255,255,255,0.65) 5px,
+    transparent 5px, transparent 18px);
+  animation: waveSlideRev 7s linear infinite;
+  opacity: 0.4;
+}
+.scene .wave-3 {
+  top: 54%;
+  background: repeating-linear-gradient(90deg,
+    rgba(255,255,255,0.5) 0, rgba(255,255,255,0.5) 7px,
+    transparent 7px, transparent 24px);
+  animation: waveSlide 5s linear infinite;
+  opacity: 0.3;
+}
+@keyframes waveSlide    { 0% { transform: translateX(0); } 100% { transform: translateX(-22px); } }
+@keyframes waveSlideRev { 0% { transform: translateX(0); } 100% { transform: translateX( 18px); } }
+
+/* Distant island silhouette behind the ocean — gives a horizon. */
+.scene .horizon {
+  position: absolute;
+  top: 38%;
+  left: 55%;
+  width: 32%;
+  height: 10%;
+  background: linear-gradient(to top, rgba(40,30,80,0.45), rgba(40,30,80,0.15));
+  clip-path: polygon(0 100%, 8% 60%, 22% 30%, 38% 55%, 55% 18%, 72% 45%, 88% 35%, 100% 65%, 100% 100%);
+  pointer-events: none;
+  filter: blur(0.3px);
+}
+/* Far-away sailing ship drifting across the horizon — pure decoration. */
+.scene .ship {
+  position: absolute;
+  top: 45%;
+  left: -15%;
+  font-size: 22px;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4));
+  animation: shipSail 90s linear infinite;
+  z-index: 1;
+}
+@keyframes shipSail {
+  0%   { left: -15%; transform: translateY(0); }
+  50%  { transform: translateY(-1px); }
+  100% { left: 115%; transform: translateY(0); }
+}
+/* Two seagulls drifting across the sky at different altitudes. */
+.scene .gull {
+  position: absolute;
+  font-size: 13px;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.35));
+  pointer-events: none;
+  animation: gullFlap 0.4s ease-in-out infinite;
+}
+.scene .gull-a {
+  top: 12%; left: -10%;
+  animation: gullFlap 0.4s ease-in-out infinite, gullDriftA 35s linear infinite;
+}
+.scene .gull-b {
+  top: 22%; left: 110%;
+  font-size: 11px;
+  animation: gullFlap 0.45s ease-in-out infinite, gullDriftB 50s linear infinite;
+}
+@keyframes gullFlap   { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.6); } }
+@keyframes gullDriftA { 0% { left: -10%; } 100% { left: 115%; } }
+@keyframes gullDriftB { 0% { left: 110%; } 100% { left: -15%; } }
+
+/* Pirate flag on a pole — perched on the cliff above the lighthouse. */
+.scene .flag-pole {
+  position: absolute;
+  top: 45%; left: 6%;
+  font-size: 16px;
+  transform: rotate(-6deg);
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5));
+  animation: flagFlutter 2.5s ease-in-out infinite;
+  z-index: 2;
+}
+@keyframes flagFlutter {
+  0%, 100% { transform: rotate(-6deg); }
+  50%      { transform: rotate(2deg); }
 }
 .scene .palm {
   position: absolute;
@@ -934,6 +1012,87 @@ canvas {
   0%, 100% { transform: scale(1);   opacity: 1; }
   50%      { transform: scale(1.4); opacity: 0.7; }
 }
+/* =========================================================
+   Building card strip — 5 compact cards pinned at the bottom
+   of the Village screen for fast star-by-star upgrades.
+   ========================================================= */
+.bld-cards {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: calc(var(--tg-safe-bottom, 0px) + 50px);  /* sit above bottom-nav */
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  padding: 6px;
+  background: linear-gradient(180deg, transparent 0%, rgba(14,8,32,0.9) 35%);
+  z-index: 15;
+  pointer-events: auto;
+}
+#screen-village .screen-scroll { padding-bottom: 108px; }   /* room for cards above nav */
+
+.bld-card {
+  background: linear-gradient(180deg, #2a1f50 0%, #1a1230 100%);
+  border: 1.5px solid #5b3a8a;
+  border-radius: 11px;
+  padding: 5px 3px;
+  text-align: center;
+  display: flex; flex-direction: column;
+  gap: 2px;
+  position: relative;
+  box-shadow: 0 3px 7px rgba(0,0,0,0.45);
+}
+.bld-card.can-afford {
+  border-color: #4ad88a;
+  box-shadow: 0 3px 7px rgba(0,0,0,0.45), 0 0 8px rgba(74,216,138,0.45);
+  animation: cardGlow 1.4s ease-in-out infinite;
+}
+@keyframes cardGlow {
+  0%, 100% { box-shadow: 0 3px 7px rgba(0,0,0,0.45), 0 0 6px rgba(74,216,138,0.4); }
+  50%      { box-shadow: 0 3px 7px rgba(0,0,0,0.45), 0 0 14px rgba(74,216,138,0.85); }
+}
+.bld-card.maxed { border-color: #ffd864; background: linear-gradient(180deg, #4a3208 0%, #2a1f50 100%); }
+.bld-card .bc-emoji {
+  font-size: 22px;
+  line-height: 1;
+  margin-top: 2px;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+}
+.bld-card .bc-stars {
+  font-size: 9px;
+  color: #5b3a8a;
+  letter-spacing: 1px;
+  line-height: 1;
+}
+.bld-card .bc-stars .lit { color: #ffd864; }
+.bld-card .bc-btn {
+  background: linear-gradient(135deg, #c9921a, #ffd864);
+  color: #2a1a04;
+  border: 1.5px solid #fff4ad;
+  border-radius: 7px;
+  padding: 4px 0;
+  font-size: 10px;
+  font-weight: 900;
+  width: 100%;
+  box-shadow: 0 2px 0 #6f4d05;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.bld-card .bc-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 #6f4d05; }
+.bld-card .bc-btn:disabled,
+.bld-card .bc-btn.cant {
+  background: linear-gradient(135deg, #555, #777);
+  border-color: #888;
+  box-shadow: 0 2px 0 #333;
+  color: #ddd;
+  cursor: not-allowed;
+}
+.bld-card .bc-btn.max {
+  background: linear-gradient(135deg, #4ad88a, #2a9d6a);
+  border-color: #6cf0a8;
+  box-shadow: 0 2px 0 #145a35;
+  color: #fff;
+}
+
 /* Upgrade preview popup (shown when a building is tapped) */
 .upgrade-pop { text-align: center; max-width: 280px; }
 .upgrade-pop .u-art {
@@ -1546,12 +1705,20 @@ canvas {
       <div class="sun">☀️</div>
       <div class="cloud cloud-a">☁️</div>
       <div class="cloud cloud-b">☁️</div>
-      <div class="waves"></div>
+      <div class="gull gull-a">🕊️</div>
+      <div class="gull gull-b">🕊️</div>
+      <div class="horizon"></div>
+      <div class="ship">⛵</div>
+      <div class="waves wave-1"></div>
+      <div class="waves wave-2"></div>
+      <div class="waves wave-3"></div>
       <div class="palm palm-left">🌴</div>
       <div class="palm palm-right">🌴</div>
+      <div class="flag-pole">🏴‍☠️</div>
       <div id="scene-buildings"></div>
     </div>
   </div>
+  <div class="bld-cards" id="bld-cards"></div>
 </div>
 
 <!-- ============ SHOP SCREEN ============ -->
@@ -4829,6 +4996,40 @@ function refreshVillageScreen() {
     bld.addEventListener('click', () => showUpgradePopup(s.id));
     wrap.appendChild(bld);
   }
+  // 5-card quick-upgrade strip pinned to the bottom of the screen.
+  const cards = document.getElementById('bld-cards');
+  if (!cards) return;
+  cards.innerHTML = '';
+  for (const s of theme.structures) {
+    const lvl = getStructLevel(s.id);
+    const maxed = lvl >= 5;
+    const cost = maxed ? 0 : structureCost(s, lvl + 1);
+    const canAfford = !maxed && state.coins >= cost;
+    let starsHtml = '';
+    for (let k = 0; k < 5; k++) starsHtml += '<span class="' + (k < lvl ? 'lit' : '') + '">★</span>';
+    let btnHtml;
+    if (maxed) {
+      btnHtml = '<button class="bc-btn max">MAX</button>';
+    } else if (canAfford) {
+      btnHtml = '<button class="bc-btn" data-bid="' + s.id + '">⬆ ' + fmtNum(cost) + '</button>';
+    } else {
+      btnHtml = '<button class="bc-btn cant" disabled>' + fmtNum(cost) + ' 💰</button>';
+    }
+    const card = document.createElement('div');
+    card.className = 'bld-card' + (canAfford ? ' can-afford' : '') + (maxed ? ' maxed' : '');
+    card.innerHTML =
+      '<div class="bc-emoji">' + s.emoji + '</div>' +
+      '<div class="bc-stars">' + starsHtml + '</div>' +
+      btnHtml;
+    cards.appendChild(card);
+  }
+  // Quick-upgrade on card-button tap (no modal — instant)
+  cards.querySelectorAll('[data-bid]').forEach(btn => {
+    btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      buildStructure(btn.getAttribute('data-bid'));
+    });
+  });
 }
 
 // Building upgrade popup — shown when player taps a building. Big art,
