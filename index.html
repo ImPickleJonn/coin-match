@@ -4628,13 +4628,65 @@ function doSmash(masterId, idx, el) {
   if (!dmg.smashed.includes(idx)) dmg.smashed.push(idx);
   dmg.pile = Math.max(0, dmg.pile - Math.floor(reward * 0.3));
   state.masterDamage[masterId] = dmg;
-  state.coins += reward;
-  state.totalGoldEarnedEver += reward;
-  state.vaultLifetimeCoins += reward;
   state.totalSmashEver++;
-  haptic('heavy');
-  el.classList.add('smashed');
+
+  // Disable further clicks while the animation plays.
+  el.style.pointerEvents = 'none';
+  const bdRect = el.getBoundingClientRect();
+  const impactX = bdRect.left + bdRect.width / 2;
+  const impactY = bdRect.top + bdRect.height / 2;
+
+  // ANIMATED HAMMER — drops in from above, rotates into impact pose.
+  const hammer = document.createElement('div');
+  hammer.textContent = '🔨';
+  hammer.style.cssText =
+    'position:fixed;left:' + impactX + 'px;top:' + (impactY - 220) + 'px;' +
+    'font-size:96px;transform:translate(-50%,-50%) rotate(-65deg);' +
+    'pointer-events:none;z-index:135;' +
+    'filter:drop-shadow(0 8px 14px rgba(0,0,0,0.65));' +
+    'transition:top 260ms cubic-bezier(0.4,0,0.25,1),transform 260ms cubic-bezier(0.4,0,0.25,1),opacity 220ms ease-out 320ms;';
+  document.body.appendChild(hammer);
+  requestAnimationFrame(() => {
+    hammer.style.top = (impactY - 30) + 'px';
+    hammer.style.transform = 'translate(-50%,-50%) rotate(25deg)';
+  });
+
+  // IMPACT — fires 270ms after hammer launch
   setTimeout(() => {
+    shake(22, 380);
+    haptic('heavy');
+    sfxBoom();
+    el.classList.add('smashed');
+    hammer.style.opacity = '0';
+    // Gold geyser: 18 orbs erupt upward, arc, fall
+    for (let i = 0; i < 18; i++) {
+      const orb = document.createElement('div');
+      const ox = impactX + (Math.random() - 0.5) * 50;
+      const oy = impactY;
+      const dx = (Math.random() - 0.5) * 280;
+      const dy = -180 - Math.random() * 180;
+      orb.style.cssText =
+        'position:fixed;left:' + ox + 'px;top:' + oy + 'px;' +
+        'width:14px;height:14px;margin-left:-7px;margin-top:-7px;' +
+        'border-radius:50%;background:radial-gradient(circle,#fff5b0 0%,#ffd864 60%,#c9921a 100%);' +
+        'box-shadow:0 0 14px #ffd864,0 0 4px #fff inset;' +
+        'pointer-events:none;z-index:138;opacity:1;will-change:left,top,opacity;' +
+        'transition:left 1.0s cubic-bezier(0.2,0.7,0.4,1),top 1.0s cubic-bezier(0.2,0.4,0.5,1),opacity 0.35s ease-in 0.65s;';
+      document.body.appendChild(orb);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        orb.style.left = (ox + dx) + 'px';
+        orb.style.top  = (oy + dy + 360) + 'px';
+        orb.style.opacity = '0';
+      }));
+      setTimeout(() => { if (orb.parentNode) orb.remove(); }, 1100);
+    }
+  }, 270);
+
+  // Award + show final reward after geyser
+  setTimeout(() => {
+    state.coins += reward;
+    state.totalGoldEarnedEver += reward;
+    state.vaultLifetimeCoins += reward;
     const final = document.getElementById('ev-final');
     final.textContent = '+' + fmtNum(reward) + ' 💰';
     final.classList.add('show');
@@ -4642,9 +4694,13 @@ function doSmash(masterId, idx, el) {
     document.getElementById('ev-done').textContent = t('continue');
     toast(t('smashed', { n: fmtNum(reward) }));
     bumpScore();
+    sfxCoinChime();
     saveState();
     refreshAllUI();
-  }, 500);
+  }, 750);
+
+  // Clean up hammer
+  setTimeout(() => { if (hammer.parentNode) hammer.remove(); }, 700);
 }
 
 function startRaid() {
@@ -4673,15 +4729,64 @@ function startRaid() {
       const s = spots[i];
       dug++;
       el.classList.add('dug');
+      const sRect = el.getBoundingClientRect();
+      const sx = sRect.left + sRect.width / 2;
+      const sy = sRect.top + sRect.height / 2;
       if (s.empty) {
         el.classList.add('empty');
         el.innerHTML = '<div class="em-icon">🕳️</div><div class="reward">empty</div>';
+        haptic('med');
+        sfxTone(180, 0.18, 0.10, 'sawtooth');
+        // Dust puff — 8 brown particles
+        for (let k = 0; k < 8; k++) {
+          const dust = document.createElement('div');
+          const dx = (Math.random() - 0.5) * 100;
+          const dy = -40 - Math.random() * 60;
+          dust.style.cssText =
+            'position:fixed;left:' + sx + 'px;top:' + sy + 'px;' +
+            'width:10px;height:10px;margin-left:-5px;margin-top:-5px;' +
+            'border-radius:50%;background:rgba(110,75,40,0.85);' +
+            'pointer-events:none;z-index:138;opacity:0.85;' +
+            'transition:left 0.8s ease-out,top 0.8s ease-out,opacity 0.6s ease-in 0.2s;';
+          document.body.appendChild(dust);
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            dust.style.left = (sx + dx) + 'px';
+            dust.style.top  = (sy + dy + 120) + 'px';
+            dust.style.opacity = '0';
+          }));
+          setTimeout(() => { if (dust.parentNode) dust.remove(); }, 900);
+        }
       } else {
         el.innerHTML = '<div class="em-icon">💰</div><div class="reward">+' + fmtNum(s.reward) + '</div>';
         total += s.reward; hits++;
+        haptic('heavy');
+        sfxCoinChime();
+        shake(8, 220);
+        // Gold geyser — 12 orbs erupting up
+        for (let k = 0; k < 12; k++) {
+          const orb = document.createElement('div');
+          const dx = (Math.random() - 0.5) * 200;
+          const dy = -150 - Math.random() * 140;
+          orb.style.cssText =
+            'position:fixed;left:' + sx + 'px;top:' + sy + 'px;' +
+            'width:12px;height:12px;margin-left:-6px;margin-top:-6px;' +
+            'border-radius:50%;background:radial-gradient(circle,#fff5b0 0%,#ffd864 65%,#c9921a 100%);' +
+            'box-shadow:0 0 10px #ffd864;' +
+            'pointer-events:none;z-index:138;opacity:1;' +
+            'transition:left 0.95s cubic-bezier(0.2,0.7,0.4,1),top 0.95s cubic-bezier(0.2,0.4,0.5,1),opacity 0.35s ease-in 0.6s;';
+          document.body.appendChild(orb);
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            orb.style.left = (sx + dx) + 'px';
+            orb.style.top  = (sy + dy + 320) + 'px';
+            orb.style.opacity = '0';
+          }));
+          setTimeout(() => { if (orb.parentNode) orb.remove(); }, 1050);
+        }
       }
-      haptic('med');
-      if (dug >= 3) finishRaid(ms.masterId, total, hits === 3);
+      if (dug >= 3) {
+        // Wait for last geyser to land before finalizing
+        setTimeout(() => finishRaid(ms.masterId, total, hits === 3), 900);
+      }
     });
   });
   openEvent();
