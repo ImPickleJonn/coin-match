@@ -1622,6 +1622,254 @@ canvas {
   max-width: 90vw;
   text-align: center;
 }
+
+/* =========================================================
+   THEME · MATRYOSHKA (bright red/cream/gold)
+   Applied via body.theme-matryoshka. Palette pulled from
+   Matryoshka project: #c9162d → #6f0f1f body, #fff4d6 cream,
+   #f5d77a / #e7b53b gold, #2b0a10 ink. Mirrors that game's
+   cute, warm aesthetic.
+   ========================================================= */
+body.theme-matryoshka {
+  background: radial-gradient(ellipse at top, #d12a44 0%, #a01a30 55%, #6f0f1f 100%);
+}
+body.theme-matryoshka .app::before {
+  background:
+    radial-gradient(ellipse 60% 35% at 20% 18%, rgba(255, 244, 214, 0.22) 0%, transparent 65%),
+    radial-gradient(ellipse 60% 35% at 80% 18%, rgba(255, 216, 100, 0.20) 0%, transparent 65%),
+    radial-gradient(ellipse 80% 40% at 50% 32%, rgba(255, 100, 80, 0.18) 0%, transparent 70%);
+}
+body.theme-matryoshka canvas {
+  background: #fbf6ee;
+  box-shadow: 0 6px 20px rgba(120, 20, 30, 0.45), inset 0 0 0 1px #f5d77a;
+}
+body.theme-matryoshka .score-card {
+  background: linear-gradient(180deg, #fff4d6 0%, #f5d77a 100%);
+  border-color: #fff;
+  box-shadow:
+    0 8px 22px rgba(120, 20, 30, 0.55),
+    0 0 0 1px rgba(255,255,255,0.6) inset,
+    0 18px 28px -8px rgba(255, 180, 60, 0.4);
+}
+body.theme-matryoshka .score-card::before {
+  color: #fff4d6;
+  text-shadow: 0 1px 2px rgba(120, 20, 30, 0.7);
+}
+body.theme-matryoshka .score-half {
+  background: linear-gradient(135deg, #fbf6ee, #ffe09a 50%, #e7b53b);
+  color: #5a1424;
+  text-shadow: 0 2px 4px rgba(255,255,255,0.5);
+}
+body.theme-matryoshka .last-match { color: #fff; text-shadow: 0 1px 2px rgba(120,20,30,0.7); }
+body.theme-matryoshka .last-match .v { color: #ffd86b; }
+
+body.theme-matryoshka .meter-block {
+  background: linear-gradient(180deg, #fff4d6 0%, #ffe09a 100%);
+  border-color: #b88317;
+  box-shadow: 0 3px 8px rgba(120,20,30,0.35), 0 0 0 1px rgba(255,255,255,0.4) inset;
+}
+body.theme-matryoshka .meter-bar {
+  background: rgba(120, 20, 30, 0.18);
+  border-color: #b88317;
+}
+body.theme-matryoshka .meter-label { color: #5a1424; }
+body.theme-matryoshka .meter-label.full { color: #fff; background: linear-gradient(135deg, #c8344f, #ff7a3e); border-color: #fff; }
+body.theme-matryoshka .booster-thumb { border-color: #fff; }
+
+body.theme-matryoshka .bottom-nav {
+  background: linear-gradient(180deg, #fff4d6 0%, #f5d77a 100%);
+  border-top: 3px solid #fff;
+  box-shadow: 0 -4px 12px rgba(120,20,30,0.3);
+}
+body.theme-matryoshka .nav-btn { color: #a01a30; }
+body.theme-matryoshka .nav-btn.active { color: #5a1424; }
+body.theme-matryoshka .nav-btn.active::after { background: #c8344f; box-shadow: 0 0 6px #c8344f; }
+
+body.theme-matryoshka .modal {
+  background: linear-gradient(180deg, #fbf6ee 0%, #ffe09a 100%);
+  border-color: #b88317;
+  box-shadow: 0 16px 40px rgba(120,20,30,0.65), inset 0 0 0 2px rgba(255, 216, 100, 0.45);
+}
+body.theme-matryoshka .modal h2 { color: #5a1424; text-shadow: 0 1px 2px rgba(255,255,255,0.6); }
+body.theme-matryoshka .modal .sub { color: #5a2a30; }
+body.theme-matryoshka .modal .row { border-bottom-color: rgba(120,20,30,0.12); color: #5a1424; }
+body.theme-matryoshka .modal-close {
+  background: rgba(120,20,30,0.15); color: #5a1424; border-color: rgba(120,20,30,0.25);
+}
+
+body.theme-matryoshka .energy-wrap {
+  background: rgba(255, 244, 214, 0.95);
+  border: 2px solid #b88317;
+  color: #5a1424;
+}
+body.theme-matryoshka .energy-bar {
+  background: rgba(120, 20, 30, 0.18);
+  border: 1.5px solid #b88317;
+}
+body.theme-matryoshka .energy-num { color: #5a1424; }
+body.theme-matryoshka .energy-timer { color: #a01a30; }
+body.theme-matryoshka .bet-btn {
+  background: linear-gradient(135deg, #c8344f, #ff7a3e);
+  border-color: #fff;
+  color: #fff;
+}
+body.theme-matryoshka .bet-btn .x { color: #ffd86b; }
+
+body.theme-matryoshka .action-btn {
+  background: linear-gradient(180deg, #fff4d6, #f5a44a);
+  border-color: #fff;
+  color: #5a1424;
+}
+body.theme-matryoshka .action-btn .count { color: #5a1424; }
+
+body.theme-matryoshka .player-name { color: #fff; text-shadow: 0 1px 2px rgba(120,20,30,0.7); }
+body.theme-matryoshka .player-trophies { color: #fff; text-shadow: 0 1px 2px rgba(120,20,30,0.7); }
+body.theme-matryoshka .master-rotation { color: rgba(255,255,255,0.85); }
+body.theme-matryoshka .master-rotation .timer { color: #ffd86b; }
+body.theme-matryoshka .mb-cell {
+  background: #fff4d6;
+  border-color: #b88317;
+}
+
+body.theme-matryoshka #toast-el {
+  background: linear-gradient(180deg, #fff 0%, #ffe09a 100%);
+  color: #5a1424;
+  border-color: #c8344f;
+}
+
+/* Cards / shop / leaderboard */
+body.theme-matryoshka .bld-card {
+  background: linear-gradient(180deg, #fff4d6 0%, #ffe09a 100%);
+  border-color: #b88317;
+}
+body.theme-matryoshka .bld-card.can-afford {
+  border-color: #2a9d8f;
+  box-shadow: 0 3px 7px rgba(120,20,30,0.35), 0 0 8px rgba(42,157,143,0.55);
+}
+body.theme-matryoshka .bld-card.maxed {
+  background: linear-gradient(180deg, #f5d77a 0%, #ffd86b 100%);
+  border-color: #b88317;
+}
+body.theme-matryoshka .bld-card .bc-stars { color: rgba(120,20,30,0.3); }
+body.theme-matryoshka .bld-card .bc-stars .lit { color: #c8344f; }
+body.theme-matryoshka .bld-tag {
+  background: rgba(120,20,30,0.85);
+  color: #fff4d6;
+  border-color: rgba(255,244,214,0.4);
+}
+body.theme-matryoshka .shop-item {
+  background: linear-gradient(180deg, #fff4d6 0%, #ffe09a 100%);
+  border-color: #b88317;
+}
+body.theme-matryoshka .shop-item.featured {
+  border-color: #c8344f;
+  background: linear-gradient(180deg, #ffd86b 0%, #f5a44a 100%);
+}
+body.theme-matryoshka .shop-item .ti { color: #5a1424; }
+body.theme-matryoshka .shop-item .desc { color: #5a2a30; }
+
+body.theme-matryoshka .lb-tabs {
+  background: rgba(255,244,214,0.6);
+  border-color: #fff;
+}
+body.theme-matryoshka .lb-tab { color: #a01a30; }
+body.theme-matryoshka .lb-tab.active { background: #c8344f; color: #fff; }
+body.theme-matryoshka .lb-row {
+  background: rgba(255,244,214,0.95);
+  border-color: #fff;
+  color: #5a1424;
+}
+body.theme-matryoshka .lb-row .rank { color: #c8344f; }
+body.theme-matryoshka .lb-row.me {
+  background: linear-gradient(180deg, #f5d77a, #ffd86b);
+  border-color: #c8344f;
+}
+body.theme-matryoshka .lb-row .score { color: #c8344f; }
+
+body.theme-matryoshka .village-header .name {
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(120,20,30,0.6);
+}
+body.theme-matryoshka .village-header .sub { color: rgba(255,244,214,0.85); }
+body.theme-matryoshka .village-progress {
+  background: rgba(255,244,214,0.92);
+  border-color: #fff;
+}
+body.theme-matryoshka .village-progress .vp-bar { background: rgba(120,20,30,0.18); border-color: #fff; }
+body.theme-matryoshka .village-progress .vp-lbl { color: #5a1424; }
+body.theme-matryoshka .section-title {
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(120,20,30,0.65);
+}
+body.theme-matryoshka .upgrade-pop .u-name,
+body.theme-matryoshka .upgrade-pop .u-lvl { color: #5a1424; }
+body.theme-matryoshka .ev-master,
+body.theme-matryoshka .ev-info {
+  background: rgba(120,20,30,0.7);
+  border-color: #f5d77a;
+  color: #fff4d6;
+}
+body.theme-matryoshka .smash-bd {
+  background: linear-gradient(180deg, #fff4d6, #ffe09a);
+  border-color: #b88317;
+}
+body.theme-matryoshka .lang-cell {
+  background: rgba(255,244,214,0.85);
+  border-color: #fff;
+  color: #5a1424;
+}
+body.theme-matryoshka .lang-cell.active {
+  background: linear-gradient(180deg, #f5d77a, #ffd86b);
+  border-color: #c8344f;
+  color: #5a1424;
+}
+body.theme-matryoshka .chest-day {
+  background: rgba(255,244,214,0.7);
+  border-color: #fff;
+  color: #5a1424;
+}
+body.theme-matryoshka .chest-day .d { color: #a01a30; }
+body.theme-matryoshka .chest-day .amt { color: #c8344f; }
+body.theme-matryoshka .chest-day.today {
+  background: linear-gradient(180deg, #f5d77a, #ffd86b);
+  border-color: #c8344f;
+  box-shadow: 0 2px 0 #b88317, 0 0 0 3px rgba(200,52,79,0.3);
+}
+
+/* Theme picker grid in Settings */
+.theme-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 6px 0;
+}
+.theme-cell {
+  padding: 10px 8px;
+  border: 2px solid rgba(255,255,255,0.10);
+  border-radius: 10px;
+  text-align: center;
+  cursor: pointer;
+  background: rgba(20, 12, 40, 0.7);
+  color: #c7cdd9;
+  font-size: 12px;
+  font-weight: 800;
+}
+.theme-cell .em { font-size: 22px; display: block; margin-bottom: 2px; }
+.theme-cell.active {
+  border-color: #ffd864;
+  background: linear-gradient(180deg, #4a3208 0%, #2a1f50 100%);
+  color: #ffd864;
+}
+body.theme-matryoshka .theme-cell {
+  background: rgba(255,244,214,0.85);
+  color: #5a1424;
+  border-color: #fff;
+}
+body.theme-matryoshka .theme-cell.active {
+  background: linear-gradient(180deg, #f5d77a, #ffd86b);
+  border-color: #c8344f;
+  color: #5a1424;
+}
 </style>
 </head>
 <body>
@@ -1977,6 +2225,7 @@ const defaultState = () => ({
   armed: { hammer: false, rocket: false, bomb: false },
   freeSpinsLeft: 0,
   muted: false,
+  uiTheme: 'dark',          // visual palette: 'dark' (Match Icon) | 'matryoshka' (bright red/cream/gold)
   streak: 0,
   dailyChestYMD: '',
   dailyChestDay: 0,
@@ -2134,6 +2383,18 @@ function applyI18n() {
   });
 }
 
+// Theme picker — palette options for the whole UI. CSS overrides live
+// under body.theme-* selectors in the stylesheet.
+const UI_THEMES = [
+  { id: 'dark',       name: 'Match Icon', emoji: '🌌', sub: 'Dark purple' },
+  { id: 'matryoshka', name: 'Matryoshka',  emoji: '🪆', sub: 'Bright red & gold' },
+];
+function applyTheme() {
+  const id = state.uiTheme || 'dark';
+  document.body.classList.remove('theme-dark', 'theme-matryoshka');
+  document.body.classList.add('theme-' + id);
+}
+
 /* =========================================================
    [23] Telegram bridge
    ========================================================= */
@@ -2221,7 +2482,7 @@ async function serverSyncNow() {
   try {
     const SYNC_KEYS = ['coins','energy','energyMax','energyRegenAt','vaultLifetimeCoins',
       'theme','village','masterDamage','shieldsStocked',
-      'boost','meter','armed','freeSpinsLeft','muted',
+      'boost','meter','armed','freeSpinsLeft','muted','uiTheme',
       'streak','dailyChestYMD','dailyChestDay',
       'totalMatchesEver','bestCascadeEver','totalGoldEarnedEver',
       'totalSmashEver','totalRaidEver','betIdx',
@@ -5584,16 +5845,39 @@ function showWelcomeModal() {
 function showSettingsModal() {
   const muteLbl = state.muted ? (state.lang === 'ru' ? 'Звук: ВЫКЛ' : 'Sound: OFF')
                               : (state.lang === 'ru' ? 'Звук: ВКЛ' : 'Sound: ON');
+  const themeHeader = state.lang === 'ru' ? 'Тема' : 'Theme';
   const html =
     '<h2>' + t('settings') + '</h2>' +
     '<div class="row" style="cursor:pointer;" id="sound-toggle">' +
       '<div>🔊 ' + (state.lang === 'ru' ? 'Звук' : 'Sound') + '</div>' +
       '<div style="color:' + (state.muted ? '#ff5c7a' : '#ffd864') + ';font-weight:900;">' + muteLbl.split(': ')[1] + '</div>' +
     '</div>' +
+    '<div style="font-size:12px;color:#c7cdd9;margin:10px 0 6px;letter-spacing:1px;text-transform:uppercase;font-weight:800;">' + themeHeader + '</div>' +
+    '<div class="theme-grid" id="theme-grid"></div>' +
     '<div style="font-size:12px;color:#c7cdd9;margin:10px 0 6px;letter-spacing:1px;text-transform:uppercase;font-weight:800;">' + t('language') + '</div>' +
     '<div class="lang-grid" id="lang-grid"></div>' +
     '<div style="text-align:center;font-size:11px;color:#5a4ab0;margin-top:10px;">' + VERSION + '</div>';
   openModal(html);
+  // Theme picker
+  const tgrid = document.getElementById('theme-grid');
+  if (tgrid) {
+    for (const th of UI_THEMES) {
+      const cell = document.createElement('div');
+      cell.className = 'theme-cell' + (th.id === (state.uiTheme || 'dark') ? ' active' : '');
+      cell.innerHTML = '<span class="em">' + th.emoji + '</span>' +
+                       '<div>' + th.name + '</div>' +
+                       '<div style="font-size:9px;opacity:0.7;font-weight:700;margin-top:2px;">' + th.sub + '</div>';
+      cell.addEventListener('click', () => {
+        state.uiTheme = th.id;
+        applyTheme();
+        saveState();
+        haptic('tap');
+        closeModal();
+        setTimeout(showSettingsModal, 80);
+      });
+      tgrid.appendChild(cell);
+    }
+  }
   const tgl = document.getElementById('sound-toggle');
   if (tgl) tgl.addEventListener('click', () => {
     state.muted = !state.muted;
@@ -5814,6 +6098,7 @@ function toast(msg) {
 (async function boot() {
   tgReady();
   applyI18n();
+  applyTheme();
   // Reveal the admin cheats button only for Pickle (TG ID 23040617)
   // or in local-dev (no Telegram init data).
   if (isPickleAdmin()) {
@@ -5841,7 +6126,12 @@ function toast(msg) {
         body: JSON.stringify({ initData: TG.initData }),
       });
       const d = await r.json();
-      if (d.exists && d.state) { Object.assign(state, d.state); saveState(); refreshAllUI(); }
+      if (d.exists && d.state) {
+        Object.assign(state, d.state);
+        applyTheme();   // server may have a newer uiTheme preference
+        saveState();
+        refreshAllUI();
+      }
     } catch (e) {}
   }
   setInterval(pollPurchases, 5000);

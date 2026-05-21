@@ -74,7 +74,7 @@ const SYNC_FIELDS = [
   'shieldsStocked',
   'skins', 'activeSkin',
   // v0.3 booster buckets + legacy v0.2 buckets (back-compat for saves)
-  'boost', 'meter', 'armed', 'freeSpinsLeft', 'muted',
+  'boost', 'meter', 'armed', 'freeSpinsLeft', 'muted', 'uiTheme',
   'betBoosterTokens', 'wildBoosterTokens', 'bagBoosterTokens',
   'streak', 'lastPlayedYMD',
   'totalCoinsEver', 'totalMatchesEver', 'totalCascadesEver',
