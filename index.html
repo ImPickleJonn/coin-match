@@ -413,12 +413,10 @@ canvas {
 }
 #boardWrap {
   position: relative;
-  margin-top: 6px;
-  /* Expand to fill all the leftover vertical space between meters and
-     the energy bar. sizeCanvas() reads our actual rect and computes
-     CELL from it, so canvas never overflows. */
-  flex: 1;
-  min-height: 0;
+  margin-top: 4px;
+  /* Match Icon does NOT flex-grab leftover space — the canvas sizes
+     itself from the formula and the wrap fits the canvas. Any leftover
+     vertical space gets absorbed by action-bar's margin-top: auto. */
   width: 100%;
   display: flex;
   align-items: center;
@@ -565,7 +563,10 @@ canvas {
   padding: 4px;
   width: 100%;
   max-width: 460px;
-  margin-top: 4px;
+  /* Push to the bottom of the flex column — any leftover space sits
+     between the energy bar and the action bar, not BELOW the action
+     bar (which would leave the boosters floating in mid-screen). */
+  margin-top: auto;
   align-items: center;
   position: relative;
 }
@@ -2915,20 +2916,14 @@ function tick(t) {
 }
 
 function sizeCanvas() {
-  // Size from the actual #boardWrap rect after layout — gives the canvas
-  // exactly the space the flex container reserved for it. Falls back to
-  // a window-based estimate when called before layout (rect is 0).
-  const wrap = document.getElementById('boardWrap');
-  let maxW = Math.min(window.innerWidth - 12, 460);
-  let maxH = window.innerHeight - 280;
-  if (wrap) {
-    const wr = wrap.getBoundingClientRect();
-    if (wr.width >= 100 && wr.height >= 100) {
-      maxW = Math.min(wr.width - 6, 460);
-      maxH = wr.height - 6;
-    }
-  }
-  CELL = Math.max(34, Math.floor(Math.min(maxW / COLS, maxH / ROWS)));
+  // Match Icon's canonical formula: maxH = innerHeight - 220. Coin Match
+  // has slightly more HUD (gold-strip + energy bar adds ~70px), so we
+  // reserve 290px. Plus a hard CELL cap so the grid never balloons on
+  // tall phones — feels visually proportional regardless of viewport.
+  const maxW = Math.min(window.innerWidth - 12, 460);
+  const maxH = Math.max(220, window.innerHeight - 290);
+  const MAX_CELL = 56;
+  CELL = Math.max(34, Math.min(MAX_CELL, Math.floor(Math.min(maxW / COLS, maxH / ROWS))));
   DPR = Math.min(2, window.devicePixelRatio || 1);
   canvas.style.width  = (CELL * COLS) + 'px';
   canvas.style.height = (CELL * ROWS) + 'px';
