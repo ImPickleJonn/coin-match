@@ -1,0 +1,3399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+<meta name="theme-color" content="#0e0820" />
+<title>Loot Match</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+/* =========================================================
+   [01] Base — body / app / safe-area
+       Direct port from Match Icon (Pickle's canonical UI).
+   ========================================================= */
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; padding: 0;
+  height: 100%;
+  background: linear-gradient(180deg, #1a1230 0%, #0e0820 100%);
+  color: #e6e9ef;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overflow: hidden;
+  overscroll-behavior: none;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+#safeAreaBar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: var(--tg-safe-top, 0px);
+  background: #000;
+  z-index: 500;
+  pointer-events: none;
+}
+.app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  padding: max(4px, var(--tg-safe-top, env(safe-area-inset-top, 4px))) 4px max(4px, var(--tg-safe-bottom, env(safe-area-inset-bottom, 4px))) 4px;
+  gap: 3px;
+  position: relative;
+  overflow: hidden;
+}
+.app::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 60% 35% at 20% 18%, rgba(255, 216, 100, 0.10) 0%, transparent 65%),
+    radial-gradient(ellipse 60% 35% at 80% 18%, rgba(91, 224, 255, 0.10) 0%, transparent 65%),
+    radial-gradient(ellipse 80% 40% at 50% 32%, rgba(176, 76, 240, 0.12) 0%, transparent 70%);
+}
+.app > * { position: relative; z-index: 1; }
+
+/* =========================================================
+   [02] Versus row — top HUD (Match Icon pattern)
+       LEFT: YOU avatar + name + coins
+       MIDDLE: GOLD score card (the prize)
+       RIGHT: Match Master avatar + name + pile
+   ========================================================= */
+.versus {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: flex-start;
+  width: 100%;
+  max-width: 460px;
+  gap: 8px;
+  padding: 2px 6px;
+}
+.player-side {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.player-side.right { flex-direction: row-reverse; }
+.player-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+}
+.player-side.right .player-meta { align-items: flex-end; }
+.player-trophies {
+  font-size: 11px;
+  font-weight: 800;
+  color: #ffd864;
+  letter-spacing: 0.3px;
+  line-height: 1;
+}
+.avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4f8cff, #6a3eff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+  border: 2px solid #4f8cff;
+  box-shadow: 0 0 8px rgba(79, 140, 255, 0.4);
+  position: relative;
+  overflow: visible;
+}
+.player-side.right .avatar {
+  background: linear-gradient(135deg, #ff3b7a, #ff6a3e);
+  border-color: #ff3b7a;
+  box-shadow: 0 0 8px rgba(255, 59, 122, 0.4);
+}
+.player-name {
+  font-size: 11px;
+  font-weight: 800;
+  color: #c7cdd9;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Master's mini-buildings row under their avatar */
+.master-buildings {
+  display: flex;
+  gap: 2px;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+.mb-cell {
+  width: 18px; height: 18px;
+  background: rgba(20, 12, 40, 0.65);
+  border: 1px solid #5b3a8a;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+}
+.mb-cell.damaged {
+  filter: grayscale(1) brightness(0.5);
+  border-color: #ff3b7a;
+}
+.master-rotation {
+  font-size: 8px;
+  font-weight: 800;
+  color: #8a8ca0;
+  letter-spacing: 1px;
+  margin-top: 1px;
+  text-align: right;
+}
+.master-rotation .timer {
+  color: #ffd864;
+  font-variant-numeric: tabular-nums;
+}
+
+/* =========================================================
+   [03] Score card — the GOLD counter
+       Adapted from Match Icon's .score-card (kept the
+       visual treatment, single gold half instead of split).
+   ========================================================= */
+.marquee {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+  position: relative;
+}
+.score-card {
+  display: flex;
+  align-items: center;
+  background: linear-gradient(180deg, #4a3208 0%, #6f4d05 100%);
+  border: 2px solid #ffd864;
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow:
+    0 8px 22px rgba(0,0,0,0.65),
+    0 0 0 1px rgba(255, 255, 255, 0.18) inset,
+    0 18px 28px -8px rgba(255, 216, 100, 0.25);
+  position: relative;
+}
+.score-card::before {
+  content: 'GOLD';
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #ffd864;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 3px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.55);
+  pointer-events: none;
+}
+.score-half {
+  padding: 10px 26px;
+  font-size: 30px;
+  font-weight: 900;
+  color: #fff;
+  min-width: 96px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  background: linear-gradient(135deg, #6f4d05, #ffd864 50%, #6f4d05);
+  text-shadow: 0 2px 4px rgba(0,0,0,0.7);
+}
+.score-half.score-bump {
+  animation: scoreBump 380ms cubic-bezier(.2,.8,.3,1.4);
+}
+@keyframes scoreBump {
+  0%   { transform: scale(1);    filter: brightness(1); }
+  35%  { transform: scale(1.18); filter: brightness(1.45); text-shadow: 0 0 14px rgba(255, 216, 100, 0.95), 0 2px 4px rgba(0,0,0,0.7); }
+  100% { transform: scale(1);    filter: brightness(1); }
+}
+
+/* Last-match small label under the score card */
+.last-match {
+  font-size: 12px;
+  font-weight: 800;
+  color: #8a8ca0;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  min-height: 16px;
+  text-align: center;
+}
+.last-match .v { color: #ffd864; font-weight: 900; }
+.last-match .cascade {
+  background: linear-gradient(90deg, #ff3b7a, #ffd864, #a263e8, #4f8cff, #ff3b7a);
+  background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent;
+  animation: cascadeShift 1.4s linear infinite;
+  font-weight: 900;
+}
+@keyframes cascadeShift {
+  from { background-position: 0% 0; }
+  to   { background-position: 100% 0; }
+}
+
+/* =========================================================
+   [04] Meter row — 3 charge meters (Hammer/Pig/Shield)
+       Match Icon has 2 (player/bot). We adapted to 3
+       horizontal meters, keeping the visual treatment.
+   ========================================================= */
+.meter-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  align-items: center;
+  width: 100%;
+  max-width: 460px;
+  gap: 5px;
+  padding: 4px 4px 0;
+  position: relative;
+  margin-top: 6px;
+}
+.meter-block {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: linear-gradient(180deg, #2a1f50 0%, #1a1230 100%);
+  border: 1.5px solid #5b3a8a;
+  border-radius: 12px;
+  padding: 3px 6px;
+  box-shadow:
+    0 3px 8px rgba(0,0,0,0.4),
+    0 0 0 1px rgba(255,255,255,0.06) inset;
+  min-width: 0;
+}
+.meter-block.armed {
+  cursor: pointer;
+  border-color: #ffd864;
+  box-shadow: 0 0 18px rgba(255, 216, 100, 0.7);
+  animation: meterArmedGlow 0.7s ease-in-out infinite;
+}
+.meter-block.armed:active { transform: scale(0.97); }
+@keyframes meterArmedGlow {
+  0%, 100% { box-shadow: 0 0 14px rgba(255, 216, 100, 0.45); }
+  50%      { box-shadow: 0 0 28px rgba(255, 216, 100, 1); }
+}
+.booster-thumb {
+  width: 30px; height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
+  border: 2px solid #fff4ad;
+  flex-shrink: 0;
+  position: relative;
+  box-shadow:
+    0 3px 6px rgba(0,0,0,0.5),
+    0 0 0 1px rgba(255,255,255,0.35) inset;
+}
+.booster-thumb.hammer { background: linear-gradient(180deg, #ffd864 0%, #ff9a30 70%, #ff6a3e 100%); }
+.booster-thumb.pig    { background: linear-gradient(180deg, #ffafce 0%, #ff77a8 70%, #c8344f 100%); }
+.booster-thumb.shield { background: linear-gradient(180deg, #8ed0ff 0%, #4f8cff 70%, #2a4faf 100%); }
+.booster-thumb.near-charged { animation: nearChargedPulse 1.4s ease-in-out infinite; }
+.booster-thumb.charged      { animation: chargedPulse 0.65s ease-in-out infinite; }
+@keyframes nearChargedPulse {
+  0%, 100% { transform: scale(1);    box-shadow: 0 0 6px rgba(255, 216, 100, 0.35); }
+  50%      { transform: scale(1.04); box-shadow: 0 0 14px rgba(255, 216, 100, 0.6); }
+}
+@keyframes chargedPulse {
+  0%, 100% { transform: scale(1)    translateY(0);    box-shadow: 0 0 16px #ffd864, 0 0 6px #fff; }
+  50%      { transform: scale(1.14) translateY(-6px); box-shadow: 0 0 32px #ffd864, 0 0 14px #fff; }
+}
+.meter-bar {
+  flex: 1;
+  height: 14px;
+  background: #2a1f50;
+  border-radius: 7px;
+  overflow: hidden;
+  position: relative;
+  border: 1.5px solid #3a2a6a;
+  min-width: 30px;
+}
+.meter-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 4px;
+  transition: width 0.4s ease-out;
+}
+.meter-block.hammer .meter-fill { background: linear-gradient(90deg, #ff8c3a, #ffb84d); }
+.meter-block.pig    .meter-fill { background: linear-gradient(90deg, #ff3b7a, #ff77a8); }
+.meter-block.shield .meter-fill { background: linear-gradient(90deg, #4f8cff, #79c2ff); }
+.meter-label {
+  font-size: 9px;
+  font-weight: 800;
+  color: #c7cdd9;
+  font-variant-numeric: tabular-nums;
+  min-width: 26px;
+  text-align: center;
+}
+.meter-label.full {
+  background: linear-gradient(135deg, #ffd864, #ff9a30);
+  color: #fff;
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+  border: 1px solid #fff4ad;
+}
+
+/* =========================================================
+   [05] Canvas / board
+   ========================================================= */
+canvas {
+  background: #0e0820;
+  border-radius: 10px;
+  display: block;
+  touch-action: none;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.5), inset 0 0 0 1px #3a2a6a;
+}
+#boardWrap {
+  position: relative;
+  margin-top: 6px;
+}
+.float-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+/* Floating "+N gold" score-fly (Match Icon pattern) */
+.score-fly {
+  position: fixed;
+  color: #ffd864;
+  font-size: 22px;
+  font-weight: 900;
+  text-shadow: 0 2px 4px #000, 0 0 8px rgba(255, 216, 100, 0.7);
+  pointer-events: none;
+  z-index: 80;
+  transition: left 0.7s cubic-bezier(0.5, 0, 0.6, 0.3),
+              top  0.7s cubic-bezier(0.5, 0, 0.6, 0.3),
+              transform 0.7s ease-in,
+              opacity 0.2s ease-out 0.55s;
+  transform: scale(1);
+  font-variant-numeric: tabular-nums;
+}
+.score-fly.flying {
+  transform: scale(0.6);
+  opacity: 0;
+}
+
+/* Combo overlay (Match Icon pattern) */
+.combo-overlay {
+  position: absolute;
+  left: 50%; top: 38%;
+  transform: translate(-50%, 0);
+  font-size: 38px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow:
+    0 3px 0 #ff3b7a,
+    0 5px 0 rgba(0,0,0,0.5),
+    0 0 16px rgba(255, 216, 100, 0.7);
+  pointer-events: none;
+  z-index: 90;
+  letter-spacing: 2px;
+  animation: comboBounce 1.1s cubic-bezier(.2,.8,.3,1.4) forwards;
+}
+@keyframes comboBounce {
+  0%   { transform: translate(-50%, 0)    scale(0.4); opacity: 0; }
+  18%  { transform: translate(-50%, 0)    scale(1.18); opacity: 1; }
+  32%  { transform: translate(-50%, 0)    scale(0.96); }
+  55%  { transform: translate(-50%, 0)    scale(1); }
+  80%  { transform: translate(-50%, 0)    scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -8px) scale(0.9); opacity: 0; }
+}
+
+/* Screen flash for big cascades */
+#screenFlash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 70;
+  opacity: 0;
+  background: rgba(255, 216, 100, 0.3);
+}
+
+/* =========================================================
+   [06] Energy bar (below grid)
+   ========================================================= */
+.energy-wrap {
+  width: 100%;
+  max-width: 460px;
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  background: #1a1230;
+  border-radius: 12px;
+  border: 2px solid #3a2a6a;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.45);
+  font-size: 12px;
+  font-weight: 800;
+}
+.energy-icon { font-size: 16px; line-height: 1; }
+.energy-bar {
+  flex: 1;
+  height: 12px;
+  background: #2a1f50;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1.5px solid #3a2a6a;
+}
+.energy-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4f8cff, #6aa0ff, #ffd864);
+  transition: width 300ms ease;
+  box-shadow: 0 0 6px rgba(79,140,255,0.5);
+}
+.energy-num {
+  color: #ffd864;
+  font-variant-numeric: tabular-nums;
+  min-width: 46px;
+  text-align: right;
+}
+.energy-wrap.empty .energy-num { color: #ff3b7a; }
+.energy-wrap.empty .energy-fill { background: #ff3b7a; }
+.energy-timer {
+  color: #8a8ca0;
+  font-size: 10px;
+  min-width: 30px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.bet-btn {
+  display: inline-flex;
+  align-items: center;
+  background: linear-gradient(135deg, #2c6dff 0%, #4f8cff 55%, #a8c7ff 100%);
+  border: 2px solid #a8c7ff;
+  border-radius: 9px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 900;
+  color: #fff;
+  cursor: pointer;
+  letter-spacing: 1px;
+  box-shadow: 0 2px 0 rgba(0,0,0,0.5);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  gap: 3px;
+}
+.bet-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 rgba(0,0,0,0.5); }
+.bet-btn .x { color: #ffd864; }
+
+/* =========================================================
+   [07] Action bar — Match Icon pattern (boosters + RULES)
+   ========================================================= */
+.action-bar {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px;
+  width: 100%;
+  max-width: 460px;
+  margin-top: 4px;
+  align-items: center;
+  position: relative;
+}
+.perk-side {
+  display: flex;
+  gap: 5px;
+}
+.perk-side.right { justify-content: flex-end; }
+.rules-btn {
+  position: relative;
+  flex: 0 0 auto;
+  width: 76px;
+  height: 46px;
+  padding: 4px 6px 2px;
+  background: linear-gradient(180deg, #3a2a6a 0%, #1f1840 100%);
+  border: 2px solid #5a4ab0;
+  border-radius: 12px;
+  color: #ffd864;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  line-height: 1;
+  box-shadow: 0 2px 0 rgba(0,0,0,0.4);
+  transition: transform 0.1s;
+}
+.rules-btn:active { transform: scale(0.95); }
+.rules-btn-icon {
+  font-size: 18px;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+}
+.rules-btn-label {
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.7);
+}
+.action-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
+  background: #1f1840;
+  border: 2px solid #3a2a6a;
+  color: #c7cdd9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+  transition: transform 0.1s, border-color 0.2s, background 0.2s, filter 0.2s;
+  position: relative;
+}
+.action-btn:active { transform: scale(0.94); }
+.action-btn.armed {
+  border-color: #ffd864;
+  background: #3a2a1f;
+  box-shadow: 0 0 12px rgba(255, 216, 100, 0.5);
+  animation: chargedPulse 0.8s ease-in-out infinite;
+}
+.action-btn.disabled, .action-btn.empty {
+  opacity: 0.35;
+}
+.action-btn .count {
+  position: absolute;
+  top: 2px; right: 4px;
+  font-size: 9px;
+  font-weight: 800;
+  color: #ffd864;
+}
+.action-btn.empty .count { color: #5a4ab0; }
+
+/* =========================================================
+   [08] Bottom nav (Loot Match-specific addition)
+       Styled to match Match Icon dark theme.
+   ========================================================= */
+.bottom-nav {
+  position: absolute;
+  bottom: var(--tg-safe-bottom, 0px);
+  left: 0; right: 0;
+  height: 50px;
+  background: linear-gradient(180deg, #1a1230 0%, #0e0820 100%);
+  border-top: 2px solid #3a2a6a;
+  display: flex;
+  z-index: 40;
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.4);
+}
+.nav-btn {
+  flex: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  font-size: 20px;
+  color: #5a4ab0;
+  position: relative;
+}
+.nav-btn .lbl {
+  font-size: 8px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  font-weight: 800;
+}
+.nav-btn.active {
+  color: #ffd864;
+}
+.nav-btn.active::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 30%; right: 30%;
+  height: 2px;
+  background: #ffd864;
+  border-radius: 0 0 3px 3px;
+  box-shadow: 0 0 6px #ffd864;
+}
+.nav-btn .badge {
+  position: absolute;
+  top: 4px; right: 22%;
+  background: #ff3b7a;
+  color: #fff;
+  border-radius: 999px;
+  padding: 1px 5px;
+  font-size: 9px;
+  font-weight: 900;
+  border: 1.5px solid #1a1230;
+  min-width: 14px;
+  text-align: center;
+}
+
+/* =========================================================
+   [09] Screens — Play, Village, Shop, Friends
+   ========================================================= */
+.screen {
+  position: absolute; inset: 0;
+  padding-bottom: 50px; /* room for bottom nav */
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+}
+.screen.active { display: flex; }
+.screen-scroll {
+  flex: 1;
+  width: 100%;
+  overflow-y: auto;
+  padding: 8px 12px 16px 12px;
+}
+.section-title {
+  text-align: center;
+  font-size: 18px;
+  font-weight: 900;
+  color: #ffd864;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+  margin: 6px 0 10px 0;
+  letter-spacing: 1px;
+}
+
+/* Village structures */
+.village-header {
+  text-align: center;
+  margin: 4px 0 10px 0;
+}
+.village-header .name {
+  font-size: 22px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+}
+.village-header .sub {
+  font-size: 11px;
+  color: #8a8ca0;
+  margin-top: 2px;
+}
+.village-progress {
+  background: #1a1230;
+  border: 2px solid #3a2a6a;
+  border-radius: 12px;
+  padding: 8px;
+  margin-bottom: 14px;
+}
+.vp-bar {
+  height: 14px;
+  background: #2a1f50;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1.5px solid #3a2a6a;
+}
+.vp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4f8cff, #ffd864);
+  width: 0%;
+  transition: width 400ms ease;
+}
+.vp-lbl {
+  display: flex; justify-content: space-between;
+  font-size: 11px; font-weight: 800;
+  margin-top: 4px;
+  color: #c7cdd9;
+}
+
+.struct-card {
+  background: linear-gradient(180deg, #2a1f50 0%, #1a1230 100%);
+  border: 2px solid #5b3a8a;
+  border-radius: 14px;
+  padding: 10px;
+  margin-bottom: 8px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+  display: flex; align-items: center; gap: 12px;
+}
+.struct-icon {
+  width: 56px; height: 56px;
+  background: #1a1230;
+  border: 2px solid #5b3a8a;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 30px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+  position: relative;
+}
+.struct-info { flex: 1; min-width: 0; }
+.struct-name {
+  font-size: 14px;
+  font-weight: 900;
+  color: #fff;
+}
+.struct-lvl {
+  font-size: 11px;
+  color: #8a8ca0;
+  margin-top: 2px;
+}
+.struct-lvl .stars { color: #ffd864; letter-spacing: 1px; }
+.struct-action {
+  display: flex; flex-direction: column;
+  align-items: center; gap: 3px;
+}
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #2c6dff 0%, #4f8cff 55%, #a8c7ff 100%);
+  color: #fff;
+  border: 2px solid #a8c7ff;
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  box-shadow: 0 3px 0 #1a3a8a, 0 5px 10px rgba(0,0,0,0.3);
+  cursor: pointer;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+.btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #1a3a8a; }
+.btn.gold {
+  background: linear-gradient(135deg, #c9921a 0%, #ffd864 55%, #fff4ad 100%);
+  border-color: #fff4ad;
+  color: #2a1a04;
+  box-shadow: 0 3px 0 #6f4d05, 0 5px 10px rgba(0,0,0,0.3);
+  text-shadow: 0 1px 0 rgba(255,255,255,0.4);
+}
+.btn.gold:active { box-shadow: 0 1px 0 #6f4d05; }
+.btn.small { padding: 5px 10px; font-size: 11px; border-radius: 8px; }
+.btn.full { width: 100%; }
+.btn.disabled { opacity: 0.5; pointer-events: none; }
+.maxed-badge {
+  background: linear-gradient(135deg, #4ad88a, #2a9d6a);
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  border: 2px solid #6cf0a8;
+}
+.struct-cost {
+  font-size: 11px;
+  color: #ffd864;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Shop items */
+.shop-item {
+  background: linear-gradient(180deg, #2a1f50 0%, #1a1230 100%);
+  border: 2px solid #5b3a8a;
+  border-radius: 14px;
+  padding: 10px;
+  margin-bottom: 7px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+  display: flex; align-items: center; gap: 10px;
+  cursor: pointer;
+}
+.shop-item:active { transform: scale(0.98); }
+.shop-item.featured {
+  border-color: #ffd864;
+  background: linear-gradient(180deg, #4a3208 0%, #1a1230 100%);
+  box-shadow: 0 4px 14px rgba(255, 216, 100, 0.25);
+}
+.shop-item .ico { font-size: 28px; min-width: 40px; text-align: center; }
+.shop-item .info { flex: 1; min-width: 0; }
+.shop-item .ti { font-size: 13px; font-weight: 900; color: #fff; }
+.shop-item .desc { font-size: 10px; color: #8a8ca0; margin-top: 2px; line-height: 1.3; }
+.shop-item .price {
+  background: linear-gradient(135deg, #c9921a, #ffd864);
+  color: #2a1a04;
+  padding: 6px 10px; border-radius: 9px;
+  font-size: 12px; font-weight: 900;
+  white-space: nowrap;
+  border: 1.5px solid #fff4ad;
+  box-shadow: 0 2px 0 #6f4d05;
+}
+
+/* Leaderboard */
+.lb-tabs {
+  display: flex; gap: 4px; margin-bottom: 10px;
+  background: rgba(20, 12, 40, 0.65);
+  border: 1.5px solid #5b3a8a;
+  border-radius: 11px;
+  padding: 3px;
+}
+.lb-tab {
+  flex: 1; padding: 7px;
+  text-align: center;
+  font-size: 11px; font-weight: 800;
+  letter-spacing: 1px; text-transform: uppercase;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #8074b0;
+}
+.lb-tab.active {
+  background: linear-gradient(135deg, #c9921a, #ffd864);
+  color: #2a1a04;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.3);
+}
+.lb-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px;
+  background: rgba(20, 12, 40, 0.65);
+  border: 1px solid #3a2a6a;
+  border-radius: 10px;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+.lb-row.me { background: linear-gradient(180deg, #4a3208 0%, #2a1f50 100%); border-color: #ffd864; }
+.lb-row .rank {
+  width: 28px; text-align: center;
+  font-weight: 900; color: #ffd864;
+  font-variant-numeric: tabular-nums;
+}
+.lb-row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 800; }
+.lb-row .score { color: #ffd864; font-weight: 900; font-variant-numeric: tabular-nums; }
+
+/* =========================================================
+   [10] Modal — generic overlay
+   ========================================================= */
+.modal-back {
+  position: absolute; inset: 0;
+  background: rgba(8, 4, 18, 0.78);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: none;
+  align-items: center; justify-content: center;
+  padding: 24px;
+}
+.modal-back.show { display: flex; }
+.modal {
+  position: relative;
+  background: linear-gradient(180deg, #2a1f50 0%, #1a1230 100%);
+  border: 2px solid #5b3a8a;
+  border-radius: 18px;
+  padding: 22px 18px 18px 18px;
+  max-width: 360px; width: 100%;
+  max-height: 86vh; overflow-y: auto;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.7),
+              inset 0 0 0 2px rgba(255, 216, 100, 0.25);
+}
+.modal h2 {
+  margin: 0 0 6px 0;
+  font-size: 22px; font-weight: 900;
+  color: #ffd864;
+  text-align: center;
+  letter-spacing: 1px;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+}
+.modal .sub {
+  text-align: center;
+  font-size: 12px; color: #c7cdd9;
+  margin-bottom: 12px;
+}
+.modal .row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.modal .row:last-child { border-bottom: none; }
+.modal-close {
+  position: absolute; top: 6px; right: 6px;
+  width: 30px; height: 30px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 19px; cursor: pointer;
+  border: 1.5px solid rgba(255,255,255,0.15);
+  font-weight: 900;
+  z-index: 2;
+}
+.modal .actions {
+  display: flex; flex-direction: column; gap: 10px;
+  margin-top: 14px;
+}
+.welcome-grid {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 10px 10px;
+  margin: 8px 0;
+  text-align: left;
+  font-size: 12px;
+  color: #c7cdd9;
+  line-height: 1.4;
+}
+.welcome-grid .em { font-size: 26px; text-align: center; }
+.welcome-grid .lbl { font-weight: 900; color: #ffd864; }
+
+/* Daily chest grid */
+.chest-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+  margin: 10px 0 12px 0;
+}
+.chest-day {
+  aspect-ratio: 1;
+  background: rgba(20, 12, 40, 0.65);
+  border: 1.5px solid #3a2a6a;
+  border-radius: 9px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  font-size: 9px;
+  position: relative;
+}
+.chest-day .em { font-size: 18px; }
+.chest-day .amt { font-size: 9px; color: #ffd864; font-weight: 800; }
+.chest-day .d { position: absolute; top: 2px; left: 4px; opacity: 0.55; font-size: 8px; font-weight: 800; color: #c7cdd9; }
+.chest-day.claimed { opacity: 0.35; }
+.chest-day.today {
+  border-color: #ffd864;
+  box-shadow: 0 0 10px rgba(255, 216, 100, 0.5);
+  background: linear-gradient(180deg, #4a3208 0%, #2a1f50 100%);
+}
+.chest-day.future { opacity: 0.55; }
+
+/* Tier-up / island complete */
+.tier-up { text-align: center; }
+.tier-up .big {
+  font-size: 80px;
+  margin: 6px 0;
+  filter: drop-shadow(0 6px 20px rgba(255, 216, 100, 0.5));
+}
+.tier-up .new-name {
+  font-size: 22px; font-weight: 900;
+  color: #ffd864;
+}
+
+/* Language picker */
+.lang-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 5px;
+  margin: 6px 0;
+}
+.lang-cell {
+  padding: 9px;
+  background: rgba(20, 12, 40, 0.7);
+  border: 1.5px solid #3a2a6a;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+  cursor: pointer;
+  color: #c7cdd9;
+}
+.lang-cell.active {
+  border-color: #ffd864;
+  background: linear-gradient(180deg, #4a3208 0%, #2a1f50 100%);
+  color: #ffd864;
+}
+.lang-cell .flag { font-size: 16px; margin-right: 5px; }
+
+/* =========================================================
+   [11] Mini-event overlay (Smash / Raid)
+   ========================================================= */
+.event-overlay {
+  position: absolute; inset: 0;
+  z-index: 120;
+  display: none;
+  flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 20px;
+  background:
+    radial-gradient(ellipse at center, rgba(255,216,100,0.2) 0%, transparent 70%),
+    rgba(8, 4, 18, 0.88);
+  backdrop-filter: blur(2px);
+}
+.event-overlay.show { display: flex; }
+.event-overlay .ev-title {
+  font-size: 36px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow:
+    0 3px 0 #ff3b7a,
+    0 5px 0 rgba(0,0,0,0.5);
+  margin-bottom: 10px;
+  letter-spacing: 2px;
+}
+.event-overlay .ev-master {
+  font-size: 13px;
+  color: #c7cdd9;
+  font-weight: 800;
+  margin-bottom: 16px;
+  background: rgba(20, 12, 40, 0.7);
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1.5px solid #5b3a8a;
+}
+.smash-buildings {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.smash-bd {
+  width: 80px; height: 80px;
+  background: linear-gradient(180deg, #2a1f50 0%, #1a1230 100%);
+  border: 3px solid #5b3a8a;
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 42px;
+  box-shadow: 0 5px 0 rgba(0,0,0,0.6), 0 8px 14px rgba(0,0,0,0.4);
+  cursor: pointer;
+  position: relative;
+  transition: transform 80ms;
+}
+.smash-bd:active { transform: scale(0.94); }
+.smash-bd.smashed {
+  filter: grayscale(1) brightness(0.4);
+  pointer-events: none;
+}
+.smash-bd.smashed::after {
+  content: '💥';
+  position: absolute;
+  inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 50px;
+  animation: bonk 400ms ease-out;
+}
+@keyframes bonk {
+  0%   { transform: scale(0); }
+  60%  { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+.raid-spots {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.raid-spot {
+  width: 110px; height: 110px;
+  background:
+    radial-gradient(circle at 50% 70%, #6b4824 0%, #4a2e12 100%);
+  border: 3px solid #2a1a04;
+  border-radius: 16px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  font-size: 36px;
+  box-shadow: 0 5px 0 #2a1a04, 0 8px 14px rgba(0,0,0,0.5),
+              inset 0 -8px 16px rgba(0,0,0,0.4);
+  cursor: pointer;
+  position: relative;
+  color: #fff;
+  transition: transform 80ms;
+}
+.raid-spot:active { transform: scale(0.94); }
+.raid-spot::before {
+  content: '⛏️';
+  font-size: 40px;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+}
+.raid-spot.dug {
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, #ffd864 0%, #c9921a 100%);
+  border-color: #6f4d05;
+  box-shadow: 0 5px 0 #6f4d05, 0 8px 14px rgba(0,0,0,0.4);
+}
+.raid-spot.dug::before { content: ''; }
+.raid-spot.dug .reward {
+  font-size: 17px;
+  font-weight: 900;
+  color: #2a1a04;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+  font-variant-numeric: tabular-nums;
+}
+.raid-spot.dug.empty {
+  background: radial-gradient(circle at 50% 50%, #999 0%, #555 100%);
+  border-color: #2a1a04;
+}
+.raid-spot.dug.empty .reward { color: #fff; font-size: 13px; }
+.raid-spot.dug .em-icon { font-size: 28px; }
+.ev-info {
+  color: #c7cdd9;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 14px;
+  background: rgba(20, 12, 40, 0.7);
+  padding: 6px 12px;
+  border-radius: 12px;
+  border: 1.5px solid #5b3a8a;
+}
+.ev-final {
+  background: linear-gradient(135deg, #c9921a, #ffd864);
+  color: #2a1a04;
+  border: 3px solid #fff4ad;
+  border-radius: 14px;
+  padding: 12px 22px;
+  font-size: 22px;
+  font-weight: 900;
+  box-shadow: 0 4px 0 #6f4d05, 0 6px 12px rgba(0,0,0,0.4);
+  margin-bottom: 14px;
+  font-variant-numeric: tabular-nums;
+  display: none;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+}
+.ev-final.show { display: block; }
+
+/* =========================================================
+   [12] Toast (Match Icon style)
+   ========================================================= */
+#toast-el {
+  position: absolute;
+  left: 50%; transform: translateX(-50%);
+  top: calc(var(--tg-safe-top, 0px) + 70px);
+  background: linear-gradient(180deg, #fff 0%, #f1ebd6 100%);
+  color: #1a1230;
+  padding: 9px 16px;
+  border-radius: 999px;
+  font-size: 12px; font-weight: 900;
+  border: 2px solid #ffd864;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.65);
+  z-index: 200;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms;
+  max-width: 90vw;
+  text-align: center;
+}
+</style>
+</head>
+<body>
+
+<div id="safeAreaBar"></div>
+
+<!-- ============ PLAY SCREEN ============ -->
+<div id="screen-play" class="screen active">
+  <div class="app">
+
+    <!-- Top: Versus row (YOU vs MATCH MASTER) -->
+    <div class="versus">
+      <div class="player-side">
+        <div class="avatar" id="playerAv">🧑</div>
+        <div class="player-meta">
+          <div class="player-name" id="playerName">YOU</div>
+          <div class="player-trophies">💰 <span id="hud-coins">0</span></div>
+        </div>
+      </div>
+      <div class="marquee">
+        <div class="score-card">
+          <div class="score-half" id="goldScore">0</div>
+        </div>
+        <div class="last-match" id="lastMatch">+0</div>
+      </div>
+      <div class="player-side right">
+        <div class="avatar" id="masterAv">🏴‍☠️</div>
+        <div class="player-meta">
+          <div class="player-name" id="masterName">MASTER</div>
+          <div class="player-trophies">💰 <span id="masterPile">0</span></div>
+          <div class="master-buildings" id="masterBuildings"></div>
+          <div class="master-rotation"><span data-i18n="new_in">NEW IN</span> <span class="timer" id="masterTimer">--:--</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Meter row: 3 charge meters -->
+    <div class="meter-row">
+      <div class="meter-block hammer" id="meter-hammer">
+        <div class="booster-thumb hammer">🔨</div>
+        <div class="meter-bar"><div class="meter-fill" id="fill-hammer"></div></div>
+        <div class="meter-label" id="label-hammer">0/20</div>
+      </div>
+      <div class="meter-block pig" id="meter-pig">
+        <div class="booster-thumb pig">🐷</div>
+        <div class="meter-bar"><div class="meter-fill" id="fill-pig"></div></div>
+        <div class="meter-label" id="label-pig">0/20</div>
+      </div>
+      <div class="meter-block shield" id="meter-shield">
+        <div class="booster-thumb shield">🛡️</div>
+        <div class="meter-bar"><div class="meter-fill" id="fill-shield"></div></div>
+        <div class="meter-label" id="label-shield">0/20</div>
+      </div>
+    </div>
+
+    <!-- Board canvas -->
+    <div id="boardWrap">
+      <canvas id="board"></canvas>
+      <div class="float-layer" id="floatLayer"></div>
+    </div>
+
+    <!-- Energy bar (below grid) -->
+    <div class="energy-wrap" id="energy-wrap">
+      <div class="energy-icon">⚡</div>
+      <div class="energy-bar"><div class="energy-fill" id="energy-fill"></div></div>
+      <div class="energy-num"><span id="energy-num">30</span>/<span id="energy-max">30</span></div>
+      <div class="energy-timer" id="energy-timer"></div>
+      <div class="bet-btn" id="bet-btn"><span data-i18n="bet">BET</span><span class="x" id="bet-x">×1</span></div>
+    </div>
+
+    <!-- Action bar — boosters + DAILY button center -->
+    <div class="action-bar">
+      <div class="perk-side">
+        <div class="action-btn" id="b-hammer">🔨<span class="count" id="cnt-hammer">0</span></div>
+        <div class="action-btn" id="b-rocket">🚀<span class="count" id="cnt-rocket">0</span></div>
+      </div>
+      <button class="rules-btn" id="rules-btn" type="button">
+        <div class="rules-btn-icon">🎁</div>
+        <div class="rules-btn-label" data-i18n="daily">DAILY</div>
+      </button>
+      <div class="perk-side right">
+        <div class="action-btn" id="b-bomb">💣<span class="count" id="cnt-bomb">0</span></div>
+        <div class="action-btn" id="b-shuffle">🔄<span class="count" id="cnt-shuffle">0</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ============ VILLAGE SCREEN ============ -->
+<div id="screen-village" class="screen">
+  <div class="screen-scroll">
+    <div class="village-header">
+      <div class="name" id="village-name">🏴‍☠️ Pirate Cove</div>
+      <div class="sub" data-i18n="village_sub">Spend gold to build your island</div>
+    </div>
+    <div class="village-progress">
+      <div class="vp-bar"><div class="vp-fill" id="vp-fill"></div></div>
+      <div class="vp-lbl">
+        <span data-i18n="island_progress">Island progress</span>
+        <span id="vp-text">0 / 25</span>
+      </div>
+    </div>
+    <div id="struct-list"></div>
+  </div>
+</div>
+
+<!-- ============ SHOP SCREEN ============ -->
+<div id="screen-shop" class="screen">
+  <div class="screen-scroll">
+    <div class="section-title" data-i18n="shop_title">SHOP · STARS ONLY</div>
+    <div id="shop-list"></div>
+  </div>
+</div>
+
+<!-- ============ FRIENDS SCREEN ============ -->
+<div id="screen-friends" class="screen">
+  <div class="screen-scroll">
+    <div class="section-title" data-i18n="leaderboard">LEADERBOARD</div>
+    <div class="lb-tabs">
+      <div class="lb-tab active" data-m="regular" data-i18n="lb_global">Global</div>
+      <div class="lb-tab" data-m="daily" data-i18n="lb_today">Today</div>
+    </div>
+    <div id="lb-list">…</div>
+  </div>
+</div>
+
+<!-- Bottom nav (over all screens) -->
+<div class="bottom-nav">
+  <div class="nav-btn" data-tab="village">🏠<div class="lbl" data-i18n="nav_village">Village</div></div>
+  <div class="nav-btn active" data-tab="play">🎰<div class="lbl" data-i18n="nav_play">Play</div></div>
+  <div class="nav-btn" data-tab="shop">🛒<div class="lbl" data-i18n="nav_shop">Shop</div></div>
+  <div class="nav-btn" data-tab="friends">👥<div class="lbl" data-i18n="nav_friends">Friends</div></div>
+</div>
+
+<!-- Modal & event overlays -->
+<div class="modal-back" id="modal-back"><div class="modal" id="modal"></div></div>
+<div class="event-overlay" id="event-overlay">
+  <div class="ev-title" id="ev-title">SMASH!</div>
+  <div class="ev-master" id="ev-master">Captain Pegleg</div>
+  <div class="ev-info" id="ev-info"></div>
+  <div id="ev-content"></div>
+  <div class="ev-final" id="ev-final"></div>
+  <button class="btn small" id="ev-done" style="display:none;">Continue</button>
+</div>
+<div id="screenFlash"></div>
+<div id="toast-el"></div>
+
+<script>
+'use strict';
+
+/* =========================================================
+   [20] Constants
+   ========================================================= */
+
+const VERSION = 'v0.4.0';
+
+// Grid — Match Icon's canonical 6×7
+const COLS = 6;
+const ROWS = 7;
+const MIN_MATCH = 3;
+const NUM_COLORS = 5;
+
+// Tile indexes
+const TILE = {
+  COLOR_0: 0, COLOR_1: 1, COLOR_2: 2, COLOR_3: 3, COLOR_4: 4,
+  HAMMER: 5, PIG: 6, SHIELD: 7,
+  MONEY_BAG: 8, WILD: 9, STAR: 10,
+};
+
+// Theme — Pirate Cove default. Tile palette: 5 treasure tiles.
+const THEMES = {
+  pirate: {
+    id: 'pirate',
+    name: 'Pirate Cove',
+    nameEmoji: '🏴‍☠️',
+    tiles: ['💎', '⚓', '🗡️', '💀', '🪙'],
+    structures: [
+      { id: 'lighthouse', emoji: '🗼', name: 'Lighthouse',     base: 150 },
+      { id: 'tavern',     emoji: '🏠', name: 'Tavern',         base: 250 },
+      { id: 'dock',       emoji: '⛵', name: 'Pirate Dock',    base: 400 },
+      { id: 'cabin',      emoji: '🛖', name: "Captain's Cabin", base: 700 },
+      { id: 'treasure',   emoji: '💰', name: 'Treasure Pile',  base: 1100 },
+    ],
+  },
+};
+
+const TILE_EMOJI_FIXED = {
+  [TILE.HAMMER]: '🔨', [TILE.PIG]: '🐷', [TILE.SHIELD]: '🛡️',
+  [TILE.MONEY_BAG]: '💰', [TILE.WILD]: '🎰', [TILE.STAR]: '⭐',
+};
+
+const TILE_VALUE = {
+  [TILE.COLOR_0]: 1.0, [TILE.COLOR_1]: 1.0, [TILE.COLOR_2]: 1.0,
+  [TILE.COLOR_3]: 1.0, [TILE.COLOR_4]: 1.0,
+  [TILE.HAMMER]: 1.0, [TILE.PIG]: 1.0, [TILE.SHIELD]: 1.0,
+  [TILE.MONEY_BAG]: 5.0, [TILE.WILD]: 1.0, [TILE.STAR]: 2.0,
+};
+
+const CHARGE_SPAWN_P = 0.10;
+const BAG_SPAWN_P    = 0.025;
+const WILD_SPAWN_P   = 0.008;
+const STAR_SPAWN_P   = 0.004;
+
+const CASCADE_MULT = [1, 1, 1.5, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0];
+
+const BETS = [
+  { mult: 1, cost: 1, label: '×1' },
+  { mult: 2, cost: 2, label: '×2' },
+  { mult: 3, cost: 3, label: '×3' },
+  { mult: 5, cost: 5, label: '×5' },
+];
+const METER_CAP = 20;
+const ENERGY_MAX_DEFAULT = 30;
+const ENERGY_REGEN_MS = 90 * 1000;
+const MASTER_ROTATION_MS = 30 * 60 * 1000;
+
+// Bot Master roster (50 personalities)
+const BOT_MASTERS = [
+  { name: 'Pegleg',    emoji: '🏴‍☠️', pileBase: 12000 },
+  { name: 'Beard Jr',  emoji: '🦜', pileBase: 18000 },
+  { name: 'Mad Mary',  emoji: '🗡️', pileBase: 8500 },
+  { name: 'Otto',      emoji: '🎯', pileBase: 22000 },
+  { name: 'Shark Sue', emoji: '🦈', pileBase: 30000 },
+  { name: 'Goldbeard', emoji: '🪙', pileBase: 45000 },
+  { name: 'Doubloon',  emoji: '💃', pileBase: 60000 },
+  { name: 'Krak',      emoji: '🐙', pileBase: 90000 },
+  { name: 'Salty Sam', emoji: '🧂', pileBase: 5500 },
+  { name: 'Tom',       emoji: '💎', pileBase: 14000 },
+  { name: 'Carl',      emoji: '💣', pileBase: 19000 },
+  { name: 'Polly',     emoji: '🦜', pileBase: 7800 },
+  { name: 'Hank',      emoji: '🪝', pileBase: 25000 },
+  { name: 'Wendy',     emoji: '🧙‍♀️', pileBase: 40000 },
+  { name: 'Carla',     emoji: '🧭', pileBase: 11000 },
+  { name: 'Steve',     emoji: '⛈️', pileBase: 16500 },
+  { name: 'Ghost Gus', emoji: '👻', pileBase: 55000 },
+  { name: 'Larry',     emoji: '😴', pileBase: 4200 },
+  { name: 'Roger',     emoji: '⚓', pileBase: 9000 },
+  { name: 'Crackjaw',  emoji: '🦷', pileBase: 28000 },
+  { name: 'Kate',      emoji: '⚔️', pileBase: 13500 },
+  { name: 'Rita',      emoji: '🐠', pileBase: 21000 },
+  { name: 'Pete',      emoji: '💰', pileBase: 75000 },
+  { name: 'Sid',       emoji: '🥷', pileBase: 17000 },
+  { name: 'Coral',     emoji: '🪸', pileBase: 32000 },
+  { name: 'Dale',      emoji: '🍻', pileBase: 6700 },
+  { name: 'Beatrice',  emoji: '⚓', pileBase: 23000 },
+  { name: 'Davy',      emoji: '☠️', pileBase: 110000 },
+  { name: 'Princess',  emoji: '👸', pileBase: 38000 },
+  { name: 'Max',       emoji: '🌴', pileBase: 10500 },
+  { name: 'Greta',     emoji: '⛵', pileBase: 26000 },
+  { name: 'Shawn',     emoji: '🪦', pileBase: 19500 },
+  { name: 'Penny',     emoji: '🦪', pileBase: 15800 },
+  { name: 'Crow',      emoji: '🦅', pileBase: 14200 },
+  { name: 'Stinky',    emoji: '🤢', pileBase: 5100 },
+  { name: 'Cal',       emoji: '🐈', pileBase: 12800 },
+  { name: 'Ivan',      emoji: '⚙️', pileBase: 33000 },
+  { name: 'Molly',     emoji: '👿', pileBase: 17500 },
+  { name: 'Will',      emoji: '🫥', pileBase: 50000 },
+  { name: 'Bones',     emoji: '🦴', pileBase: 8400 },
+  { name: 'Quick',     emoji: '⚡', pileBase: 21500 },
+  { name: 'Mike',      emoji: '🪓', pileBase: 27000 },
+  { name: 'Lily',      emoji: '🔭', pileBase: 9800 },
+  { name: 'Anya',      emoji: '⚓', pileBase: 24500 },
+  { name: 'Tom Tide',  emoji: '🌊', pileBase: 13800 },
+  { name: 'Crusty',    emoji: '🦀', pileBase: 7300 },
+  { name: 'Smuggler',  emoji: '📦', pileBase: 19800 },
+  { name: 'King Rex',  emoji: '👑', pileBase: 150000 },
+  { name: 'Diana',     emoji: '🏹', pileBase: 34000 },
+  { name: 'Edith',     emoji: '🕰️', pileBase: 200000 },
+];
+
+const DAILY_CHEST = [
+  { coins: 200,   energy: 0,  em: '💰' },
+  { coins: 400,   energy: 2,  em: '⚡' },
+  { coins: 700,   energy: 0,  em: '💎' },
+  { coins: 1200,  energy: 5,  em: '⚡' },
+  { coins: 2000,  energy: 0,  em: '💍' },
+  { coins: 3500,  energy: 0,  em: '👑' },
+  { coins: 8000,  energy: 15, em: '🎁' },
+];
+
+const STAR_SHOP_FALLBACK = [
+  { id: 'starter_pack',  ico: '🎁', title: 'Starter Pack',  desc: '10,000 gold + 5 ⚡ + 5 hammers', price: 199, featured: true },
+  { id: 'coins_small',   ico: '💰', title: '5,000 Gold',    desc: 'Coin Pile',         price: 99 },
+  { id: 'coins_medium',  ico: '💰', title: '20,000 Gold',   desc: '+25% bonus',        price: 299 },
+  { id: 'coins_large',   ico: '💰', title: '50,000 Gold',   desc: '+40% bonus',        price: 599 },
+  { id: 'coins_mega',    ico: '💰', title: '100,000 Gold',  desc: '+60% bonus',        price: 999 },
+  { id: 'energy_refill', ico: '⚡', title: 'Energy +5',     desc: 'Quick refill',      price: 40 },
+  { id: 'energy_full',   ico: '⚡', title: 'Energy Full',   desc: 'Instant full ⚡',   price: 199 },
+  { id: 'hammer_pack',   ico: '🔨', title: 'Hammer ×5',     desc: 'Smash 1 tile each', price: 49 },
+  { id: 'rocket_pack',   ico: '🚀', title: 'Rocket ×5',     desc: 'Clear row + column',price: 99 },
+  { id: 'bomb_pack',     ico: '💣', title: 'Bomb ×5',       desc: 'Clear 3×3',         price: 99 },
+  { id: 'shuffle_pack',  ico: '🔄', title: 'Shuffle ×5',    desc: 'Reshuffle board',   price: 49 },
+];
+
+const STORAGE_KEY = 'loot-match-save-v4';
+
+// Emojis to pre-cache for canvas tile rendering (Match Icon pattern)
+const CACHED_EMOJI_BASE = ['💎', '⚓', '🗡️', '💀', '🪙', '🔨', '🐷', '🛡️', '💰', '🎰', '⭐'];
+const EMOJI_FONT_STACK = '-apple-system, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", system-ui, sans-serif';
+
+/* =========================================================
+   [21] State
+   ========================================================= */
+
+const defaultState = () => ({
+  coins: 500,
+  energy: ENERGY_MAX_DEFAULT,
+  energyMax: ENERGY_MAX_DEFAULT,
+  energyRegenAt: 0,
+  vaultLifetimeCoins: 0,
+  theme: 'pirate',
+  village: {},
+  masterDamage: {},
+  shieldsStocked: 0,
+  boost: { hammer: 0, rocket: 0, bomb: 0, shuffle: 0 },
+  meter: { hammer: 0, pig: 0, shield: 0 },
+  armed: { hammer: false, rocket: false, bomb: false },
+  freeSpinsLeft: 0,
+  streak: 0,
+  dailyChestYMD: '',
+  dailyChestDay: 0,
+  totalMatchesEver: 0,
+  bestCascadeEver: 0,
+  totalGoldEarnedEver: 0,
+  totalSmashEver: 0,
+  totalRaidEver: 0,
+  betIdx: 0,
+  lastMatchGold: 0,
+  welcomed: false,
+  firstSeenAt: Date.now(),
+  lang: 'en',
+});
+
+let state = loadState();
+function loadState() {
+  try {
+    let raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) raw = localStorage.getItem('loot-match-save-v3');
+    if (!raw) raw = localStorage.getItem('loot-match-save-v2');
+    if (!raw) raw = localStorage.getItem('loot-match-save-v1');
+    if (!raw) return defaultState();
+    const obj = JSON.parse(raw);
+    return Object.assign(defaultState(), obj);
+  } catch (e) { return defaultState(); }
+}
+function saveState() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+  serverSyncDebounced();
+}
+
+/* =========================================================
+   [22] i18n
+   ========================================================= */
+
+const LANGS = [
+  { code: 'en', name: 'English',    flag: '🇬🇧' },
+  { code: 'ru', name: 'Русский',    flag: '🇷🇺' },
+  { code: 'es', name: 'Español',    flag: '🇪🇸' },
+  { code: 'pt', name: 'Português',  flag: '🇵🇹' },
+  { code: 'de', name: 'Deutsch',    flag: '🇩🇪' },
+  { code: 'fr', name: 'Français',   flag: '🇫🇷' },
+  { code: 'it', name: 'Italiano',   flag: '🇮🇹' },
+  { code: 'tr', name: 'Türkçe',     flag: '🇹🇷' },
+  { code: 'pl', name: 'Polski',     flag: '🇵🇱' },
+  { code: 'nl', name: 'Nederlands', flag: '🇳🇱' },
+  { code: 'uk', name: 'Українська', flag: '🇺🇦' },
+  { code: 'ar', name: 'العربية',     flag: '🇸🇦' },
+  { code: 'hi', name: 'हिन्दी',        flag: '🇮🇳' },
+  { code: 'id', name: 'Indonesia',  flag: '🇮🇩' },
+  { code: 'vi', name: 'Tiếng Việt', flag: '🇻🇳' },
+  { code: 'th', name: 'ไทย',         flag: '🇹🇭' },
+  { code: 'ja', name: '日本語',       flag: '🇯🇵' },
+  { code: 'ko', name: '한국어',       flag: '🇰🇷' },
+  { code: 'zh', name: '中文',         flag: '🇨🇳' },
+  { code: 'fa', name: 'فارسی',       flag: '🇮🇷' },
+];
+
+const I18N = {
+  en: {
+    new_in: 'NEW IN', bet: 'BET', daily: 'DAILY',
+    nav_village: 'Village', nav_play: 'Play', nav_shop: 'Shop', nav_friends: 'Friends',
+    village_sub: 'Spend gold to build your island',
+    island_progress: 'Island progress',
+    shop_title: 'SHOP · STARS ONLY',
+    leaderboard: 'LEADERBOARD',
+    lb_global: 'Global', lb_today: 'Today',
+    not_enough_energy: 'Out of energy.',
+    energy_full: 'FULL',
+    bet_changed: 'Bet: {n}',
+    no_more_moves: 'No moves — reshuffling…',
+    welcome_title: 'Welcome to Loot Match!',
+    welcome_match: 'Match 3+ tiles to win gold.',
+    welcome_cascade: 'Cascades multiply your reward — chain for MEGA wins.',
+    welcome_charge: 'Match 🔨 / 🐷 / 🛡️ tiles to charge attacks on the Match Master.',
+    welcome_village: 'Spend gold to build your island, finish to unlock new themes.',
+    lets_go: "Let's Go!",
+    daily_chest: 'Daily Chest',
+    daily_streak: 'Streak: {n} days',
+    claim: 'Claim',
+    come_back_tomorrow: 'Come back tomorrow!',
+    smash: 'SMASH!',
+    raid: 'RAID!',
+    shield_armed: 'SHIELD ARMED',
+    tap_to_smash: 'Tap a building to smash it!',
+    tap_to_dig: 'Tap 3 of 4 spots to dig',
+    continue: 'Continue',
+    perfect: 'PERFECT RAID!',
+    build: 'BUILD', upgrade: 'UPGRADE', maxed: 'MAXED',
+    lvl: 'Lvl',
+    island_complete: 'ISLAND COMPLETE!',
+    bonus_coins: '+{n} bonus gold',
+    not_enough_coins: 'Not enough gold!',
+    raided: 'RAIDED for {n}',
+    smashed: 'SMASHED for {n}',
+    shield_ok: 'Shield ready!',
+    language: 'Language',
+    settings: 'Settings',
+    no_iap: 'IAP disabled locally',
+  },
+  ru: {
+    new_in: 'ЧЕРЕЗ', bet: 'СТАВКА', daily: 'СУНДУК',
+    nav_village: 'Деревня', nav_play: 'Игра', nav_shop: 'Магазин', nav_friends: 'Друзья',
+    village_sub: 'Трать золото на свой остров',
+    island_progress: 'Прогресс острова',
+    shop_title: 'МАГАЗИН · ТОЛЬКО STARS',
+    leaderboard: 'ЛИДЕРЫ',
+    lb_global: 'Глобально', lb_today: 'Сегодня',
+    not_enough_energy: 'Кончилась энергия.',
+    energy_full: 'ПОЛНО',
+    bet_changed: 'Ставка: {n}',
+    no_more_moves: 'Нет ходов — перемешиваю…',
+    welcome_title: 'Добро пожаловать в Loot Match!',
+    welcome_match: 'Собирай 3+ плитки в ряд за золото.',
+    welcome_cascade: 'Каскады умножают награду!',
+    welcome_charge: 'Собирай 🔨 / 🐷 / 🛡️ — заряжай атаку на Мастера.',
+    welcome_village: 'Трать золото на остров. Закончи — открой новые темы.',
+    lets_go: 'Поехали!',
+    daily_chest: 'Ежедневный сундук',
+    daily_streak: 'Серия: {n} дней',
+    claim: 'Забрать',
+    come_back_tomorrow: 'Возвращайся завтра!',
+    smash: 'УДАР!',
+    raid: 'НАЛЁТ!',
+    shield_armed: 'ЩИТ ГОТОВ',
+    tap_to_smash: 'Нажми на здание!',
+    tap_to_dig: 'Выбери 3 из 4 спотов',
+    continue: 'Дальше',
+    perfect: 'ИДЕАЛЬНЫЙ НАЛЁТ!',
+    build: 'СТРОИТЬ', upgrade: 'УЛУЧШИТЬ', maxed: 'МАКС',
+    lvl: 'Ур',
+    island_complete: 'ОСТРОВ ЗАВЕРШЁН!',
+    bonus_coins: '+{n} бонусного золота',
+    not_enough_coins: 'Мало золота!',
+    raided: 'НАГРАБИЛ {n}',
+    smashed: 'РАЗБИЛ на {n}',
+    shield_ok: 'Щит готов!',
+    language: 'Язык',
+    settings: 'Настройки',
+    no_iap: 'Покупки выкл. локально',
+  },
+};
+for (const l of LANGS) if (!I18N[l.code]) I18N[l.code] = I18N.en;
+
+function t(key, vars) {
+  const dict = I18N[state.lang] || I18N.en;
+  let s = dict[key] || I18N.en[key] || key;
+  if (vars) for (const k of Object.keys(vars)) s = s.replace('{' + k + '}', vars[k]);
+  return s;
+}
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.getAttribute('data-i18n'));
+  });
+}
+
+/* =========================================================
+   [23] Telegram bridge
+   ========================================================= */
+
+const TG = window.Telegram && window.Telegram.WebApp;
+function tgReady() {
+  if (!TG) return;
+  try {
+    TG.ready();
+    TG.expand();
+    if (TG.requestFullscreen) try { TG.requestFullscreen(); } catch (e) {}
+    if (TG.disableVerticalSwipes) try { TG.disableVerticalSwipes(); } catch (e) {}
+    if (TG.lockOrientation) try { TG.lockOrientation(); } catch (e) {}
+    applySafeArea();
+    if (TG.onEvent) {
+      TG.onEvent('viewportChanged', applySafeArea);
+      TG.onEvent('safeAreaChanged', applySafeArea);
+      TG.onEvent('contentSafeAreaChanged', applySafeArea);
+    }
+    if (state.lang === 'en' && TG.initDataUnsafe && TG.initDataUnsafe.user && TG.initDataUnsafe.user.language_code) {
+      const lc = String(TG.initDataUnsafe.user.language_code).slice(0, 2).toLowerCase();
+      if (I18N[lc]) state.lang = lc;
+    }
+    if (TG.initDataUnsafe && TG.initDataUnsafe.user) {
+      const u = TG.initDataUnsafe.user;
+      const n = (u.first_name || u.username || 'YOU').slice(0, 12).toUpperCase();
+      document.getElementById('playerName').textContent = n;
+    }
+  } catch (e) {}
+}
+function applySafeArea() {
+  if (!TG) return;
+  const csi = TG.contentSafeAreaInset || TG.safeAreaInset || {};
+  const top = Math.max(0, csi.top || 0);
+  const bottom = Math.max(0, csi.bottom || 0);
+  document.documentElement.style.setProperty('--tg-safe-top', top + 'px');
+  document.documentElement.style.setProperty('--tg-safe-bottom', bottom + 'px');
+  sizeCanvas();
+}
+function haptic(kind) {
+  if (!TG || !TG.HapticFeedback) return;
+  try {
+    if (kind === 'tap')        TG.HapticFeedback.impactOccurred('light');
+    else if (kind === 'med')   TG.HapticFeedback.impactOccurred('medium');
+    else if (kind === 'heavy') TG.HapticFeedback.impactOccurred('heavy');
+    else if (kind === 'success') TG.HapticFeedback.notificationOccurred('success');
+    else if (kind === 'err')   TG.HapticFeedback.notificationOccurred('error');
+  } catch (e) {}
+}
+
+/* =========================================================
+   [24] Server sync
+   ========================================================= */
+
+let serverSyncTimer = 0;
+function serverSyncDebounced() {
+  if (!TG || !TG.initData) return;
+  clearTimeout(serverSyncTimer);
+  serverSyncTimer = setTimeout(serverSyncNow, 2500);
+}
+async function serverSyncNow() {
+  if (!TG || !TG.initData) return;
+  try {
+    const SYNC_KEYS = ['coins','energy','energyMax','energyRegenAt','vaultLifetimeCoins',
+      'theme','village','masterDamage','shieldsStocked',
+      'boost','meter','armed','freeSpinsLeft',
+      'streak','dailyChestYMD','dailyChestDay',
+      'totalMatchesEver','bestCascadeEver','totalGoldEarnedEver',
+      'totalSmashEver','totalRaidEver','betIdx',
+      'welcomed','firstSeenAt','lang'];
+    const patch = {};
+    for (const k of SYNC_KEYS) patch[k] = state[k];
+    await fetch('/api/state/save', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: TG.initData, patch }),
+    });
+  } catch (e) {}
+}
+let IAP_ENABLED = false;
+let SKUS = [];
+async function fetchServerFlags() {
+  try { const r = await fetch('/api/flags'); const d = await r.json(); IAP_ENABLED = !!d.iap; } catch (e) {}
+  try { const r = await fetch('/api/skus');  const d = await r.json(); SKUS = d.skus || []; } catch (e) {}
+}
+async function pollPurchases() {
+  if (!TG || !TG.initData) return;
+  try {
+    const r = await fetch('/api/poll-purchases', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: TG.initData }),
+    });
+    const d = await r.json();
+    if (d.purchases && d.purchases.length) {
+      for (const p of d.purchases) applyGrant(p.grant);
+      saveState(); refreshAllUI();
+      toast('Purchase received!');
+    }
+  } catch (e) {}
+}
+function applyGrant(g) {
+  if (!g) return;
+  if (g.coins)     { state.coins += g.coins; bumpScore(); }
+  if (g.energy)    state.energy = Math.min(state.energyMax + g.energy, state.energy + g.energy);
+  if (g.energyMax) state.energyMax += g.energyMax;
+  if (g.hammer)    state.boost.hammer  += g.hammer;
+  if (g.rocket)    state.boost.rocket  += g.rocket;
+  if (g.bomb)      state.boost.bomb    += g.bomb;
+  if (g.shuffle)   state.boost.shuffle += g.shuffle;
+  if (g.shieldsStocked) state.shieldsStocked += g.shieldsStocked;
+}
+async function buySku(sku) {
+  if (!IAP_ENABLED) { toast(t('no_iap')); return; }
+  if (!TG || !TG.initData) { toast(t('no_iap')); return; }
+  try {
+    const r = await fetch('/api/create-invoice', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: TG.initData, sku }),
+    });
+    const d = await r.json();
+    if (d.link && TG.openInvoice) {
+      TG.openInvoice(d.link, (status) => {
+        if (status === 'paid') {
+          setTimeout(pollPurchases, 1200);
+          setTimeout(pollPurchases, 3500);
+        }
+      });
+    } else toast('Could not open invoice');
+  } catch (e) { toast('Purchase failed'); }
+}
+
+/* =========================================================
+   [25] Energy regen
+   ========================================================= */
+
+function tickEnergy() {
+  if (state.energy >= state.energyMax) { state.energyRegenAt = 0; return; }
+  const now = Date.now();
+  if (!state.energyRegenAt) state.energyRegenAt = now + ENERGY_REGEN_MS;
+  while (state.energyRegenAt && now >= state.energyRegenAt && state.energy < state.energyMax) {
+    state.energy++;
+    state.energyRegenAt += ENERGY_REGEN_MS;
+  }
+  if (state.energy >= state.energyMax) state.energyRegenAt = 0;
+}
+function energyCountdownStr() {
+  if (state.energy >= state.energyMax) return t('energy_full');
+  const ms = (state.energyRegenAt || 0) - Date.now();
+  if (ms <= 0) return '';
+  const m = Math.floor(ms / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  return m + ':' + String(s).padStart(2, '0');
+}
+setInterval(() => {
+  const had = state.energy;
+  tickEnergy();
+  if (had !== state.energy) saveState();
+  refreshEnergyUI();
+  refreshMasterTimer();
+}, 1000);
+
+/* =========================================================
+   [26] Match Master rotation (deterministic client-side)
+   ========================================================= */
+
+function getMasterUserSeed() {
+  if (TG && TG.initDataUnsafe && TG.initDataUnsafe.user) return Math.abs(TG.initDataUnsafe.user.id | 0);
+  let g = localStorage.getItem('lm-uid');
+  if (!g) { g = String(Math.floor(Math.random() * 1e9)); localStorage.setItem('lm-uid', g); }
+  return parseInt(g, 10) || 1;
+}
+function currentMasterWindow() { return Math.floor(Date.now() / MASTER_ROTATION_MS); }
+function masterMillisLeft()    { return MASTER_ROTATION_MS - (Date.now() % MASTER_ROTATION_MS); }
+function getCurrentMaster() {
+  const seed = getMasterUserSeed();
+  const win = currentMasterWindow();
+  let h = seed ^ (win * 2654435761);
+  h = (h ^ (h >>> 16)) >>> 0;
+  const idx = h % BOT_MASTERS.length;
+  return { masterId: 'bot-' + idx + '-w' + win, idx, bot: BOT_MASTERS[idx], win };
+}
+function getMasterState() {
+  const cur = getCurrentMaster();
+  const theme = THEMES.pirate;
+  const damage = state.masterDamage[cur.masterId] || { smashed: [], pile: cur.bot.pileBase };
+  const structures = theme.structures.map((s, i) => ({ ...s, smashed: damage.smashed.includes(i), idx: i }));
+  return { masterId: cur.masterId, bot: cur.bot, structures, pile: damage.pile, win: cur.win };
+}
+function pruneOldMasterDamage() {
+  const win = currentMasterWindow();
+  for (const k of Object.keys(state.masterDamage)) {
+    const m = k.match(/-w(\d+)$/);
+    if (m && parseInt(m[1], 10) < win - 1) delete state.masterDamage[k];
+  }
+}
+
+/* =========================================================
+   [27] Canvas — emoji cache (Match Icon pattern)
+   ========================================================= */
+
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+let CELL = 44, DPR = 1;
+let emojiCache = Object.create(null);
+let emojiCacheCell = 0;
+
+// =========================================================
+// Animation system globals — ported from Match Icon.
+// Animations are SEPARATE objects (not attached to tiles).
+// One rAF loop runs every frame; render() reads animations
+// + particles + grid and draws everything in one pass.
+// =========================================================
+let animations = [];
+let particles = [];
+let lastTickTime = 0;
+let screenShake = { intensity: 0, duration: 0, start: 0 };
+const now = performance.now.bind(performance);
+
+function easeOut(p)   { return 1 - Math.pow(1 - p, 3); }
+function easeInOut(p) { return p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2; }
+
+function startSwapAnim(r1, c1, r2, c2, onDone) {
+  const t0 = now(), dur = 180;
+  animations.push({
+    type: 'swap', r1, c1, r2, c2, t0, dur, p: 0,
+    update(t) { this.p = Math.min(1, (t - t0) / dur); return this.p >= 1; },
+    done: onDone,
+  });
+}
+function startPopAnim(cells, onDone) {
+  const t0 = now(), dur = 240;
+  animations.push({
+    type: 'pop', cells: [...cells], t0, dur, p: 0,
+    update(t) { this.p = Math.min(1, (t - t0) / dur); return this.p >= 1; },
+    done: onDone,
+  });
+}
+function startFallAnim(falls, onDone) {
+  if (!falls || !falls.length) { if (onDone) onDone(); return; }
+  const t0 = now();
+  let maxDist = 1;
+  for (const f of falls) maxDist = Math.max(maxDist, f.toRow - f.fromRow);
+  const dur = 100 + maxDist * 55;
+  animations.push({
+    type: 'fall', falls, t0, dur, p: 0,
+    update(t) { this.p = Math.min(1, (t - t0) / dur); return this.p >= 1; },
+    done: onDone,
+  });
+}
+function shake(intensity, durationMs) {
+  if (intensity > screenShake.intensity) {
+    screenShake.intensity = intensity;
+    screenShake.duration = durationMs;
+    screenShake.start = now();
+  }
+}
+function getShakeOffset() {
+  if (screenShake.intensity <= 0) return { x: 0, y: 0 };
+  const elapsed = now() - screenShake.start;
+  if (elapsed >= screenShake.duration) { screenShake.intensity = 0; return { x: 0, y: 0 }; }
+  const decay = 1 - elapsed / screenShake.duration;
+  const i = screenShake.intensity * decay;
+  return { x: (Math.random() - 0.5) * i * 2, y: (Math.random() - 0.5) * i * 2 };
+}
+
+// Particle burst — ported from Match Icon. Per-tile color sparkle on clear.
+function spawnParticles(x, y, color, count, power) {
+  count = count || 12; power = power || 1;
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.6;
+    const speed = (1.6 + Math.random() * 2.8) * power;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 1.6 * power,
+      life: 700 + Math.random() * 350,
+      maxLife: 1000,
+      color,
+      size: 2.5 + Math.random() * 3.5,
+      gravity: 0.16,
+      twinkle: Math.random() * Math.PI * 2,
+    });
+  }
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy;
+    p.vy += p.gravity; p.vx *= 0.97;
+    p.life -= dt;
+    if (p.twinkle !== undefined) p.twinkle += dt * 0.012;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+function drawParticles() {
+  for (const p of particles) {
+    const a = Math.max(0, p.life / p.maxLife);
+    const twinkle = p.twinkle !== undefined ? (0.65 + 0.35 * Math.sin(p.twinkle)) : 1;
+    const finalA = a * twinkle;
+    const sz = p.size * (0.6 + a * 0.6);
+    ctx.globalAlpha = finalA * 0.35;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, sz * 2.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = finalA;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, sz, 0, Math.PI * 2);
+    ctx.fill();
+    if (a > 0.6) {
+      ctx.globalAlpha = finalA * (a - 0.6) * 2;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, sz * 0.45, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = p.color;
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+function tileParticleColor(tl) {
+  if (tl === TILE.HAMMER)    return '#ff8c3a';
+  if (tl === TILE.PIG)       return '#ff77a8';
+  if (tl === TILE.SHIELD)    return '#4fb2ff';
+  if (tl === TILE.MONEY_BAG) return '#ffd864';
+  if (tl === TILE.WILD)      return '#a263e8';
+  if (tl === TILE.STAR)      return '#fff4ad';
+  const cols = ['#ff5c7a', '#ffaf3a', '#4ad88a', '#4fb2ff', '#b878ff'];
+  return cols[tl] || '#ffffff';
+}
+
+// Swipe trail dot — soft sparkle following the finger during drag.
+function spawnSwipeDot(px, py) {
+  // Throttle to ~30 dots/sec so we don't drown the DOM
+  if (spawnSwipeDot._last && now() - spawnSwipeDot._last < 30) return;
+  spawnSwipeDot._last = now();
+  const el = document.createElement('div');
+  el.style.cssText =
+    'position:fixed;left:' + (px - 5) + 'px;top:' + (py - 5) + 'px;' +
+    'width:10px;height:10px;border-radius:50%;' +
+    'background:radial-gradient(circle,#ffd864 0%,rgba(255,216,100,0) 70%);' +
+    'pointer-events:none;z-index:75;opacity:0.85;' +
+    'transition:transform 350ms ease-out,opacity 350ms ease-out;will-change:transform,opacity;';
+  document.body.appendChild(el);
+  requestAnimationFrame(() => {
+    el.style.transform = 'scale(0.3)';
+    el.style.opacity = '0';
+  });
+  setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 380);
+}
+
+// Main rAF loop — runs every frame, updates animations + particles + render.
+function tick(t) {
+  const tm = t || now();
+  const dt = lastTickTime ? Math.min(50, tm - lastTickTime) : 16;
+  lastTickTime = tm;
+  updateParticles(dt);
+  const finished = [];
+  for (const a of animations) if (a.update(tm)) finished.push(a);
+  for (const a of finished) {
+    const idx = animations.indexOf(a);
+    if (idx >= 0) animations.splice(idx, 1);
+    if (a.done) a.done();
+  }
+  render();
+  requestAnimationFrame(tick);
+}
+
+function sizeCanvas() {
+  // Reserve vertical room for HUD + bottom nav. The canvas should be the
+  // largest possible square fitting horizontally within the screen.
+  const maxW = Math.min(window.innerWidth - 12, 460);
+  // HUD: versus row ~64 + meter row ~36 + last-match ~16 + energy ~38 +
+  // action bar ~46 + bottom nav 50 + safe-area + paddings ~10 = ~260
+  const maxH = window.innerHeight - 280;
+  CELL = Math.max(36, Math.floor(Math.min(maxW / COLS, maxH / ROWS)));
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  canvas.style.width  = (CELL * COLS) + 'px';
+  canvas.style.height = (CELL * ROWS) + 'px';
+  canvas.width  = CELL * COLS * DPR;
+  canvas.height = CELL * ROWS * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  if (CELL > 0 && CELL !== emojiCacheCell) rebuildEmojiCache(CELL);
+  render();
+}
+
+function rebuildEmojiCache(cell) {
+  emojiCache = Object.create(null);
+  emojiCacheCell = cell;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const logicalSize = Math.ceil(cell * 1.45);
+  const pad = Math.ceil(logicalSize * 0.18);
+  const total = logicalSize + pad * 2;
+  const allEmojis = CACHED_EMOJI_BASE.slice();
+  for (const ch of allEmojis) {
+    const off = document.createElement('canvas');
+    off.width = total * dpr;
+    off.height = total * dpr;
+    const octx = off.getContext('2d');
+    octx.scale(dpr, dpr);
+    octx.font = logicalSize + 'px ' + EMOJI_FONT_STACK;
+    octx.textAlign = 'center';
+    octx.textBaseline = 'middle';
+    octx.shadowColor = 'rgba(0,0,0,0.55)';
+    octx.shadowBlur = 6;
+    octx.shadowOffsetY = 2;
+    octx.fillText(ch, total / 2, total / 2);
+    emojiCache[ch] = { canvas: off, total: total, size: logicalSize };
+  }
+}
+
+function drawEmojiSprite(c, ch, cx, cy, size) {
+  const entry = emojiCache[ch];
+  if (!entry) {
+    // Fallback if not cached
+    c.font = size + 'px ' + EMOJI_FONT_STACK;
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText(ch, cx, cy);
+    return;
+  }
+  const scale = size / entry.size;
+  const drawTotal = entry.total * scale;
+  c.drawImage(entry.canvas, cx - drawTotal / 2, cy - drawTotal / 2, drawTotal, drawTotal);
+}
+
+window.addEventListener('resize', () => { sizeCanvas(); });
+
+/* =========================================================
+   [28] Match3 engine
+   ========================================================= */
+
+let grid = [];
+
+function makeEmptyGrid() {
+  const g = new Array(ROWS);
+  for (let r = 0; r < ROWS; r++) g[r] = new Array(COLS).fill(-1);
+  return g;
+}
+function spawnFreshGrid() {
+  grid = makeEmptyGrid();
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      grid[r][c] = pickFreshTile(r, c);
+    }
+  }
+}
+function pickFreshTile(r, c) {
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const tl = Math.floor(Math.random() * NUM_COLORS);
+    if (c >= 2 && grid[r][c - 1] === tl && grid[r][c - 2] === tl) continue;
+    if (r >= 2 && grid[r - 1][c] === tl && grid[r - 2][c] === tl) continue;
+    return tl;
+  }
+  return Math.floor(Math.random() * NUM_COLORS);
+}
+function pickReplenishTile() {
+  const r = Math.random();
+  let acc = 0;
+  if (r < (acc += STAR_SPAWN_P)) return TILE.STAR;
+  if (r < (acc += WILD_SPAWN_P)) return TILE.WILD;
+  if (r < (acc += BAG_SPAWN_P))  return TILE.MONEY_BAG;
+  if (r < (acc += CHARGE_SPAWN_P)) return TILE.HAMMER;
+  if (r < (acc += CHARGE_SPAWN_P)) return TILE.PIG;
+  if (r < (acc += CHARGE_SPAWN_P)) return TILE.SHIELD;
+  return Math.floor(Math.random() * NUM_COLORS);
+}
+function tilesMatch(a, b) {
+  if (a === -1 || b === -1) return false;
+  if (a === TILE.WILD || b === TILE.WILD) return true;
+  return a === b;
+}
+function findMatches() {
+  const cells = new Set();
+  let groups = 0;
+  for (let r = 0; r < ROWS; r++) {
+    let s = 0;
+    for (let c = 1; c <= COLS; c++) {
+      const cont = c < COLS && tilesMatch(grid[r][s], grid[r][c]);
+      if (!cont) {
+        const len = c - s;
+        if (len >= MIN_MATCH) { groups++; for (let k = s; k < c; k++) cells.add(r + ',' + k); }
+        s = c;
+      }
+    }
+  }
+  for (let c = 0; c < COLS; c++) {
+    let s = 0;
+    for (let r = 1; r <= ROWS; r++) {
+      const cont = r < ROWS && tilesMatch(grid[s][c], grid[r][c]);
+      if (!cont) {
+        const len = r - s;
+        if (len >= MIN_MATCH) { groups++; for (let k = s; k < r; k++) cells.add(k + ',' + c); }
+        s = r;
+      }
+    }
+  }
+  return { cells, groups };
+}
+function trySwap(r1, c1, r2, c2) {
+  if (Math.abs(r1 - r2) + Math.abs(c1 - c2) !== 1) return false;
+  const tmp = grid[r1][c1]; grid[r1][c1] = grid[r2][c2]; grid[r2][c2] = tmp;
+  const m = findMatches();
+  if (m.cells.size === 0) {
+    const t2 = grid[r1][c1]; grid[r1][c1] = grid[r2][c2]; grid[r2][c2] = t2;
+    return false;
+  }
+  return true;
+}
+// Apply gravity & spawn new tiles. Returns an array of fall objects
+// (col, fromRow, toRow, tile) the animation system uses to interpolate
+// each tile's drop. New tiles get a negative fromRow so they slide in
+// from above the board.
+function applyGravity() {
+  const falls = [];
+  for (let c = 0; c < COLS; c++) {
+    let wr = ROWS - 1;
+    for (let r = ROWS - 1; r >= 0; r--) {
+      if (grid[r][c] !== -1) {
+        if (r !== wr) {
+          falls.push({ col: c, fromRow: r, toRow: wr, tile: grid[r][c] });
+          grid[wr][c] = grid[r][c]; grid[r][c] = -1;
+        }
+        wr--;
+      }
+    }
+    let spawnFrom = -1;
+    for (let r = wr; r >= 0; r--) {
+      const tl = pickReplenishTile();
+      grid[r][c] = tl;
+      falls.push({ col: c, fromRow: spawnFrom, toRow: r, tile: tl });
+      spawnFrom--;
+    }
+  }
+  return falls;
+}
+function hasPossibleMove() {
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    const tries = [[r, c, r, c + 1], [r, c, r + 1, c]];
+    for (const [a, b, x, y] of tries) {
+      if (x >= ROWS || y >= COLS) continue;
+      const tmp = grid[a][b]; grid[a][b] = grid[x][y]; grid[x][y] = tmp;
+      const m = findMatches();
+      const t2 = grid[a][b]; grid[a][b] = grid[x][y]; grid[x][y] = t2;
+      if (m.cells.size > 0) return true;
+    }
+  }
+  return false;
+}
+function reshuffleGrid() {
+  const all = [];
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) all.push(grid[r][c]);
+  for (let i = all.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = all[i]; all[i] = all[j]; all[j] = tmp;
+  }
+  for (let attempt = 0; attempt < 6; attempt++) {
+    let idx = 0;
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) grid[r][c] = all[idx++];
+    if (findMatches().cells.size === 0 && hasPossibleMove()) return;
+    for (let i = all.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = all[i]; all[i] = all[j]; all[j] = tmp;
+    }
+  }
+  spawnFreshGrid();
+}
+
+/* =========================================================
+   [29] Resolve cascade + scoring + meter charge
+   ========================================================= */
+
+const game = { busy: false, selected: null, cascadeDepth: 0, cascadeMax: 0 };
+
+function tileEmoji(t) {
+  if (t < NUM_COLORS) return THEMES[state.theme].tiles[t];
+  return TILE_EMOJI_FIXED[t] || '?';
+}
+function effectiveBet() {
+  let idx = state.betIdx;
+  if (idx < 0) idx = 0;
+  if (idx >= BETS.length) idx = BETS.length - 1;
+  return BETS[idx];
+}
+
+// =========================================================
+// Animation-driven swap + cascade flow.
+// Pattern (verbatim from Match Icon):
+//   Swap forward (anim) → if no match: swap back (anim) → done
+//                       → if match:  commit grid → processCascadeStep
+//   processCascadeStep: find matches → score+particles → pop anim
+//     → clear cells in grid → gravity (returns falls) → fall anim
+//     → recurse processCascadeStep
+// All grid mutations happen IN BETWEEN animations, never during them.
+// =========================================================
+
+function attemptSwap(r1, c1, r2, c2) {
+  if (game.busy) return;
+
+  // Hammer booster — destroys a single tile, no swap, no energy.
+  if (state.armed.hammer) {
+    state.armed.hammer = false; setBoosterArmed('hammer', false);
+    if (state.boost.hammer > 0) state.boost.hammer--;
+    game.busy = true;
+    haptic('heavy');
+    startPopAnim([r1 + ',' + c1], () => {
+      const tile = grid[r1][c1];
+      spawnParticles(c1 * CELL + CELL/2, r1 * CELL + CELL/2, tileParticleColor(tile), 14, 1.8);
+      grid[r1][c1] = -1;
+      const falls = applyGravity();
+      startFallAnim(falls, () => {
+        game.cascadeDepth = 0;
+        game.cascadeMax = 0;
+        processCascadeStep();
+      });
+    });
+    refreshAllUI();
+    return;
+  }
+  if (state.armed.rocket) {
+    state.armed.rocket = false; setBoosterArmed('rocket', false);
+    if (state.boost.rocket > 0) state.boost.rocket--;
+    game.busy = true;
+    haptic('heavy');
+    shake(8, 280);
+    const cells = [];
+    for (let cc = 0; cc < COLS; cc++) cells.push(r1 + ',' + cc);
+    for (let rr = 0; rr < ROWS; rr++) if (rr !== r1) cells.push(rr + ',' + c1);
+    for (const key of cells) {
+      const [r, c] = key.split(',').map(Number);
+      const tile = grid[r][c];
+      if (tile !== -1) spawnParticles(c * CELL + CELL/2, r * CELL + CELL/2, tileParticleColor(tile), 8, 1.4);
+    }
+    startPopAnim(cells, () => {
+      for (const key of cells) {
+        const [r, c] = key.split(',').map(Number);
+        grid[r][c] = -1;
+      }
+      const falls = applyGravity();
+      startFallAnim(falls, () => {
+        game.cascadeDepth = 0; game.cascadeMax = 0;
+        processCascadeStep();
+      });
+    });
+    refreshAllUI();
+    return;
+  }
+  if (state.armed.bomb) {
+    state.armed.bomb = false; setBoosterArmed('bomb', false);
+    if (state.boost.bomb > 0) state.boost.bomb--;
+    game.busy = true;
+    haptic('heavy');
+    shake(10, 320);
+    const cells = [];
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      const rr = r1 + dr, cc = c1 + dc;
+      if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS) cells.push(rr + ',' + cc);
+    }
+    for (const key of cells) {
+      const [r, c] = key.split(',').map(Number);
+      const tile = grid[r][c];
+      if (tile !== -1) spawnParticles(c * CELL + CELL/2, r * CELL + CELL/2, tileParticleColor(tile), 10, 1.6);
+    }
+    startPopAnim(cells, () => {
+      for (const key of cells) {
+        const [r, c] = key.split(',').map(Number);
+        grid[r][c] = -1;
+      }
+      const falls = applyGravity();
+      startFallAnim(falls, () => {
+        game.cascadeDepth = 0; game.cascadeMax = 0;
+        processCascadeStep();
+      });
+    });
+    refreshAllUI();
+    return;
+  }
+
+  // Standard swap path. Adjacency + match-validation, animated bounce-back on fail.
+  if (Math.abs(r1 - r2) + Math.abs(c1 - c2) !== 1) return;
+  // Peek: swap in grid, check matches, REVERT (we'll re-apply through animation).
+  const a = grid[r1][c1], b = grid[r2][c2];
+  grid[r1][c1] = b; grid[r2][c2] = a;
+  const peekMatch = findMatches();
+  grid[r1][c1] = a; grid[r2][c2] = b;
+  const willMatch = peekMatch.cells.size > 0;
+
+  if (!willMatch) {
+    // Bounce-back: mutate for anim 1 (visual swap), un-mutate for anim 2
+    // (visual return). The swap-anim render reads grid[r1][c1] and slides
+    // it from x2a → x1a, so it ALWAYS draws tiles ending at their grid
+    // positions. Mutating before each anim is what gives the natural feel.
+    haptic('err');
+    game.busy = true;
+    grid[r1][c1] = b; grid[r2][c2] = a;
+    startSwapAnim(r1, c1, r2, c2, () => {
+      grid[r1][c1] = a; grid[r2][c2] = b;
+      startSwapAnim(r1, c1, r2, c2, () => { game.busy = false; });
+    });
+    return;
+  }
+
+  // Energy / free-spin check.
+  const bet = effectiveBet();
+  const energyCost = state.freeSpinsLeft > 0 ? 0 : bet.cost;
+  if (state.energy < energyCost) {
+    haptic('err'); toast(t('not_enough_energy'));
+    flashEnergyEmpty();
+    return;
+  }
+  if (state.freeSpinsLeft > 0) state.freeSpinsLeft--;
+  else {
+    state.energy -= energyCost;
+    if (state.energy < state.energyMax && !state.energyRegenAt) {
+      state.energyRegenAt = Date.now() + ENERGY_REGEN_MS;
+    }
+  }
+  refreshEnergyUI();
+
+  // Valid swap: mutate grid FIRST so the anim renders tiles sliding from
+  // their pre-swap positions to their grid positions, then start cascade.
+  game.busy = true;
+  grid[r1][c1] = b; grid[r2][c2] = a;
+  startSwapAnim(r1, c1, r2, c2, () => {
+    game.cascadeDepth = 0;
+    game.cascadeMax = 0;
+    processCascadeStep();
+  });
+}
+
+function processCascadeStep() {
+  const m = findMatches();
+  if (m.cells.size === 0) {
+    // Cascade chain ended.
+    if (game.cascadeMax >= 2) {
+      const labels = [null, null, 'NICE!', 'COMBO!', 'INSANE!', 'UNSTOPPABLE!', 'LEGENDARY!'];
+      const label = labels[Math.min(game.cascadeMax, labels.length - 1)] || 'LEGENDARY!';
+      showComboOverlay(label);
+    }
+    if (state.meter.shield >= METER_CAP) {
+      state.shieldsStocked = Math.min(3, state.shieldsStocked + 1);
+      state.meter.shield = 0;
+      toast(t('shield_ok')); haptic('success');
+    }
+    if (!hasPossibleMove()) {
+      toast(t('no_more_moves'));
+      setTimeout(() => {
+        reshuffleGrid();
+        game.busy = false;
+        refreshAllUI();
+      }, 450);
+      return;
+    }
+    if (TG && TG.initData) {
+      fetch('/api/score/submit', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData: TG.initData, score: state.vaultLifetimeCoins, mode: 'regular' }),
+      }).catch(() => {});
+    }
+    saveState();
+    refreshAllUI();
+    game.busy = false;
+    return;
+  }
+  game.cascadeDepth++;
+  game.cascadeMax = Math.max(game.cascadeMax, game.cascadeDepth);
+  if (game.cascadeDepth > state.bestCascadeEver) state.bestCascadeEver = game.cascadeDepth;
+  state.totalMatchesEver += m.groups;
+  scoreMatchedCells(m.cells);
+
+  const popCells = [...m.cells];
+  startPopAnim(popCells, () => {
+    for (const key of popCells) {
+      const [r, c] = key.split(',').map(Number);
+      grid[r][c] = -1;
+    }
+    const falls = applyGravity();
+    startFallAnim(falls, processCascadeStep);
+  });
+}
+
+function scoreMatchedCells(cells) {
+  const mult = CASCADE_MULT[Math.min(game.cascadeDepth, CASCADE_MULT.length - 1)];
+  const bet = effectiveBet();
+  let stepCoins = 0;
+  const chargeAdd = { hammer: 0, pig: 0, shield: 0 };
+  let starCount = 0;
+  for (const key of cells) {
+    const [r, c] = key.split(',').map(Number);
+    const tile = grid[r][c];
+    if (tile === -1) continue;
+    const cellVal = TILE_VALUE[tile] || 1;
+    const earn = cellVal * bet.mult * mult;
+    stepCoins += earn;
+    spawnScoreFly(c, r, '+' + Math.floor(earn));
+    const px = c * CELL + CELL / 2;
+    const py = r * CELL + CELL / 2;
+    spawnParticles(px, py, tileParticleColor(tile), 12, 1.8);
+    spawnParticles(px, py, '#ffffff', 5, 1.4);
+    if (tile === TILE.HAMMER)      chargeAdd.hammer++;
+    else if (tile === TILE.PIG)    chargeAdd.pig++;
+    else if (tile === TILE.SHIELD) chargeAdd.shield++;
+    else if (tile === TILE.STAR)   starCount++;
+  }
+  const chargeMult = Math.max(1, Math.floor(mult * 0.5 + bet.mult * 0.5));
+  const earnedInt = Math.floor(stepCoins);
+  state.coins += earnedInt;
+  state.totalGoldEarnedEver += earnedInt;
+  state.vaultLifetimeCoins += earnedInt;
+  state.lastMatchGold = earnedInt;
+  state.meter.hammer = Math.min(METER_CAP, state.meter.hammer + chargeAdd.hammer * chargeMult);
+  state.meter.pig    = Math.min(METER_CAP, state.meter.pig    + chargeAdd.pig    * chargeMult);
+  state.meter.shield = Math.min(METER_CAP, state.meter.shield + chargeAdd.shield * chargeMult);
+  if (starCount > 0) {
+    const burst = 5 * starCount;
+    state.meter.hammer = Math.min(METER_CAP, state.meter.hammer + burst);
+    state.meter.pig    = Math.min(METER_CAP, state.meter.pig    + burst);
+    state.meter.shield = Math.min(METER_CAP, state.meter.shield + burst);
+  }
+  if (game.cascadeDepth === 1)      haptic('tap');
+  else if (game.cascadeDepth === 2) haptic('med');
+  else if (game.cascadeDepth === 3) { haptic('heavy'); shake(4, 180); }
+  else if (game.cascadeDepth >= 4)  { haptic('success'); shake(8, 280); flashScreen('rgba(255,216,100,0.35)', 0.4, 260); }
+  bumpScore();
+  refreshGoldUI();
+  refreshMetersUI();
+  refreshLastMatch();
+}
+
+function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+/* =========================================================
+   [30] Render — emoji tiles on dark canvas
+   ========================================================= */
+
+// Animation-aware render. Reads grid + active animations + particles every
+// frame. Cells participating in an active swap/fall are skipped from the
+// static draw and drawn separately at their interpolated positions.
+// Pop animations apply to cells still in the grid (scale + alpha down).
+function render() {
+  if (!ctx) return;
+  const cssW = COLS * CELL;
+  const cssH = ROWS * CELL;
+  ctx.clearRect(0, 0, cssW, cssH);
+
+  // Screen shake for big hits
+  const off = getShakeOffset();
+  ctx.save();
+  ctx.translate(off.x, off.y);
+
+  // Backdrop
+  ctx.fillStyle = '#0e0820';
+  ctx.fillRect(-20, -20, cssW + 40, cssH + 40);
+
+  // Subtle grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.lineWidth = 1;
+  for (let c = 1; c < COLS; c++) {
+    ctx.beginPath();
+    ctx.moveTo(c * CELL + 0.5, 0);
+    ctx.lineTo(c * CELL + 0.5, cssH);
+    ctx.stroke();
+  }
+  for (let r = 1; r < ROWS; r++) {
+    ctx.beginPath();
+    ctx.moveTo(0, r * CELL + 0.5);
+    ctx.lineTo(cssW, r * CELL + 0.5);
+    ctx.stroke();
+  }
+
+  // Build skip set: which (r,c) cells are being animated by swap/fall and
+  // therefore should NOT be drawn at their grid position.
+  const skip = new Set();
+  for (const a of animations) {
+    if (a.type === 'swap') {
+      skip.add(a.r1 + ',' + a.c1);
+      skip.add(a.r2 + ',' + a.c2);
+    } else if (a.type === 'fall') {
+      for (const f of a.falls) skip.add(f.toRow + ',' + f.col);
+    }
+  }
+
+  // Static tiles — drawn at grid position, with pop scale/alpha if applicable
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (skip.has(r + ',' + c)) continue;
+      const tl = grid[r][c];
+      if (tl === -1) continue;
+      let scale = 1, alpha = 1;
+      for (const a of animations) {
+        if (a.type === 'pop' && a.cells.indexOf(r + ',' + c) !== -1) {
+          const p = easeOut(a.p);
+          scale = 1 - p;
+          alpha = 1 - p;
+        }
+      }
+      drawTileAt(tl, c * CELL, r * CELL, scale, alpha);
+    }
+  }
+
+  // Animated tiles — swap (interpolating along the swap line) + fall (drop in)
+  for (const a of animations) {
+    if (a.type === 'swap') {
+      const p = easeInOut(a.p);
+      // During the swap, grid still holds the PRE-swap values.
+      // Reading grid[r1][c1] gives the tile that's sliding toward (r2,c2),
+      // and vice versa. The two tiles cross each other smoothly.
+      const t1 = grid[a.r1][a.c1];
+      const t2 = grid[a.r2][a.c2];
+      const x1a = a.c1 * CELL, y1a = a.r1 * CELL;
+      const x2a = a.c2 * CELL, y2a = a.r2 * CELL;
+      if (t1 !== -1) drawTileAt(t1, x1a + (x2a - x1a) * p, y1a + (y2a - y1a) * p, 1, 1);
+      if (t2 !== -1) drawTileAt(t2, x2a + (x1a - x2a) * p, y2a + (y1a - y2a) * p, 1, 1);
+    } else if (a.type === 'fall') {
+      const p = easeOut(a.p);
+      for (const f of a.falls) {
+        const x = f.col * CELL;
+        const y = f.fromRow * CELL + (f.toRow - f.fromRow) * CELL * p;
+        if (f.tile !== -1) drawTileAt(f.tile, x, y, 1, 1);
+      }
+    }
+  }
+
+  // Selection ring on top
+  if (game.selected) {
+    const r = game.selected.r, c = game.selected.c;
+    // Don't show ring if that cell is being animated (it'd float on empty)
+    if (!skip.has(r + ',' + c)) {
+      const x = c * CELL, y = r * CELL;
+      ctx.save();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#ffd864';
+      ctx.shadowColor = '#ffd864';
+      ctx.shadowBlur = 14;
+      const pad = 3;
+      roundRectPath(x + pad, y + pad, CELL - pad * 2, CELL - pad * 2, CELL * 0.16);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // Booster armed cursor — dashed border to show "armed" state
+  if (state.armed.hammer || state.armed.rocket || state.armed.bomb) {
+    ctx.save();
+    ctx.strokeStyle = '#ffd864';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([6, 5]);
+    ctx.shadowColor = '#ffd864';
+    ctx.shadowBlur = 10;
+    roundRectPath(2, 2, cssW - 4, cssH - 4, 10);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  drawParticles();
+  ctx.restore();
+}
+
+// Draw a single tile at arbitrary canvas coords with scale + alpha.
+// (Replaces the old grid-coord-only drawTile.)
+function drawTileAt(t, x, y, scale, alpha) {
+  if (scale <= 0 || alpha <= 0) return;
+  const cx = x + CELL / 2;
+  const cy = y + CELL / 2;
+  const size = CELL * 0.78 * scale;
+  if (alpha !== 1) ctx.globalAlpha = alpha;
+  drawEmojiSprite(ctx, tileEmoji(t), cx, cy, size);
+  if (alpha !== 1) ctx.globalAlpha = 1;
+}
+
+function roundRectPath(x, y, w, h, r) {
+  if (typeof ctx.roundRect === 'function') { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); return; }
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+/* =========================================================
+   [31] Input — tap-tap + swipe
+   ========================================================= */
+
+// =========================================================
+// Input — drag-to-swipe (Match Icon pattern).
+// onPointerDown: grab origin cell.
+// onPointerMove: as soon as drag crosses DRAG_THRESHOLD in any
+//                cardinal direction, fire attemptSwap and clear
+//                dragStart so we don't double-fire.
+// onPointerUp:   if no swipe happened, treat as tap-to-select;
+//                a second adjacent tap completes a swap.
+// During drag, spawn small sparkle dots along the finger path.
+// =========================================================
+
+const DRAG_THRESHOLD = 12;
+let dragStart = null;
+let isSwiping = false;
+
+function cellFromEvent(ev) {
+  const rect = canvas.getBoundingClientRect();
+  const cellCss = rect.width / COLS;
+  const px = (ev.clientX != null ? ev.clientX : (ev.touches && ev.touches[0] ? ev.touches[0].clientX : null));
+  const py = (ev.clientY != null ? ev.clientY : (ev.touches && ev.touches[0] ? ev.touches[0].clientY : null));
+  if (px == null) return null;
+  const x = px - rect.left;
+  const y = py - rect.top;
+  const c = Math.floor(x / cellCss);
+  const r = Math.floor(y / cellCss);
+  if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return null;
+  return { r, c, x: px, y: py };
+}
+
+function onPointerDown(ev) {
+  if (ev.cancelable) ev.preventDefault();
+  if (game.busy) return;
+  const cell = cellFromEvent(ev);
+  if (!cell) return;
+  isSwiping = true;
+  // Hammer / rocket / bomb boosters target a single cell.
+  if (state.armed.hammer || state.armed.rocket || state.armed.bomb) {
+    attemptSwap(cell.r, cell.c, cell.r, cell.c);
+    return;
+  }
+  dragStart = cell;
+}
+
+function onPointerMove(ev) {
+  // Swipe trail dots — runs for the whole gesture, not just before swap.
+  if (isSwiping) {
+    const px = (ev.clientX != null ? ev.clientX : (ev.touches && ev.touches[0] ? ev.touches[0].clientX : null));
+    const py = (ev.clientY != null ? ev.clientY : (ev.touches && ev.touches[0] ? ev.touches[0].clientY : null));
+    if (px != null && py != null) spawnSwipeDot(px, py);
+  }
+  if (!dragStart || game.busy) return;
+  const rect = canvas.getBoundingClientRect();
+  const px = (ev.clientX != null ? ev.clientX : (ev.touches && ev.touches[0] ? ev.touches[0].clientX : null));
+  const py = (ev.clientY != null ? ev.clientY : (ev.touches && ev.touches[0] ? ev.touches[0].clientY : null));
+  if (px == null) return;
+  const dx = px - dragStart.x;
+  const dy = py - dragStart.y;
+  if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
+  // Threshold crossed: snap to a cardinal swap.
+  let r2 = dragStart.r, c2 = dragStart.c;
+  if (Math.abs(dx) > Math.abs(dy)) c2 += dx > 0 ? 1 : -1;
+  else                              r2 += dy > 0 ? 1 : -1;
+  if (r2 < 0 || r2 >= ROWS || c2 < 0 || c2 >= COLS) { dragStart = null; return; }
+  const from = dragStart;
+  dragStart = null;
+  game.selected = null;
+  attemptSwap(from.r, from.c, r2, c2);
+}
+
+function onPointerUp(ev) {
+  isSwiping = false;
+  if (game.busy || !dragStart) { dragStart = null; return; }
+  // No swipe happened — treat as tap-to-select with optional adjacent commit.
+  const cell = dragStart;
+  dragStart = null;
+  if (game.selected) {
+    const dr = Math.abs(game.selected.r - cell.r);
+    const dc = Math.abs(game.selected.c - cell.c);
+    if (dr + dc === 1) {
+      const from = game.selected;
+      game.selected = null;
+      attemptSwap(from.r, from.c, cell.r, cell.c);
+      return;
+    }
+  }
+  game.selected = (game.selected && game.selected.r === cell.r && game.selected.c === cell.c) ? null : cell;
+}
+
+canvas.addEventListener('mousedown', onPointerDown);
+canvas.addEventListener('mousemove', onPointerMove);
+canvas.addEventListener('mouseup', onPointerUp);
+canvas.addEventListener('touchstart', onPointerDown, { passive: false });
+canvas.addEventListener('touchmove',  onPointerMove,  { passive: false });
+canvas.addEventListener('touchend',   onPointerUp);
+canvas.addEventListener('touchcancel', () => { dragStart = null; isSwiping = false; });
+canvas.addEventListener('mouseleave', () => { dragStart = null; isSwiping = false; });
+
+/* =========================================================
+   [32] VFX — score-fly, score bump, combo overlay, screen flash
+       (Direct port from Match Icon spawnScoreFly / scoreBump.)
+   ========================================================= */
+
+function spawnScoreFly(col, row, text) {
+  const rect = canvas.getBoundingClientRect();
+  const startX = rect.left + col * CELL + CELL / 2;
+  const startY = rect.top  + row * CELL + CELL / 2;
+  const target = document.getElementById('goldScore');
+  if (!target) return;
+  const trect = target.getBoundingClientRect();
+  const endX = trect.left + trect.width / 2;
+  const endY = trect.top  + trect.height / 2;
+
+  const fly = document.createElement('div');
+  fly.className = 'score-fly';
+  fly.textContent = text;
+  fly.style.left = startX + 'px';
+  fly.style.top  = startY + 'px';
+  document.body.appendChild(fly);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      fly.style.left = endX + 'px';
+      fly.style.top  = endY + 'px';
+      fly.classList.add('flying');
+    });
+  });
+  setTimeout(() => { if (fly.parentNode) fly.parentNode.removeChild(fly); }, 1000);
+}
+
+function bumpScore() {
+  const el = document.getElementById('goldScore');
+  if (!el) return;
+  el.classList.remove('score-bump');
+  void el.offsetWidth;
+  el.classList.add('score-bump');
+  setTimeout(() => el.classList.remove('score-bump'), 400);
+}
+
+function showComboOverlay(text) {
+  const wrap = document.getElementById('floatLayer');
+  if (!wrap) return;
+  const el = document.createElement('div');
+  el.className = 'combo-overlay';
+  el.textContent = text;
+  wrap.appendChild(el);
+  setTimeout(() => { if (el.parentNode) el.remove(); }, 1100);
+}
+
+function flashScreen(color, peakAlpha, durMs) {
+  const overlay = document.getElementById('screenFlash');
+  if (!overlay) return;
+  overlay.style.background = color;
+  overlay.style.opacity = peakAlpha;
+  overlay.style.transition = 'none';
+  void overlay.offsetWidth;
+  overlay.style.transition = 'opacity ' + durMs + 'ms ease-out';
+  overlay.style.opacity = '0';
+}
+
+function flashEnergyEmpty() {
+  const row = document.getElementById('energy-wrap');
+  if (!row) return;
+  row.classList.add('empty');
+  setTimeout(() => row.classList.remove('empty'), 600);
+}
+
+/* =========================================================
+   [33] UI refresh
+   ========================================================= */
+
+function fmtNum(n) {
+  n = Math.floor(n);
+  if (n >= 1e9) return (n / 1e9).toFixed(1).replace(/\.0$/, '') + 'B';
+  if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (n >= 1e4) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
+  return n.toLocaleString('en-US');
+}
+function refreshAllUI() {
+  refreshGoldUI();
+  refreshEnergyUI();
+  refreshBetBtn();
+  refreshLastMatch();
+  refreshBoosterCounts();
+  refreshMetersUI();
+  refreshMasterBlock();
+  refreshVillageScreen();
+}
+function refreshGoldUI() {
+  const v = fmtNum(state.coins);
+  const el = document.getElementById('goldScore');
+  if (el) el.textContent = v;
+  const hud = document.getElementById('hud-coins');
+  if (hud) hud.textContent = v;
+}
+function refreshEnergyUI() {
+  const numEl = document.getElementById('energy-num');
+  const maxEl = document.getElementById('energy-max');
+  if (numEl) numEl.textContent = state.energy;
+  if (maxEl) maxEl.textContent = state.energyMax;
+  const fill = document.getElementById('energy-fill');
+  if (fill) fill.style.width = (state.energy / state.energyMax * 100) + '%';
+  const tm = document.getElementById('energy-timer');
+  if (tm) tm.textContent = energyCountdownStr();
+  const row = document.getElementById('energy-wrap');
+  if (row) row.classList.toggle('empty', state.energy <= 0);
+}
+function refreshBetBtn() {
+  const bet = effectiveBet();
+  const el = document.getElementById('bet-x');
+  if (el) el.textContent = bet.label;
+}
+function refreshLastMatch() {
+  const lm = document.getElementById('lastMatch');
+  if (!lm) return;
+  if (state.lastMatchGold <= 0) { lm.innerHTML = '+0'; return; }
+  let html = '<span class="v">+' + fmtNum(state.lastMatchGold) + '</span>';
+  if (game.cascadeMax >= 2) html += '  <span class="cascade">CASCADE×' + game.cascadeMax + '</span>';
+  lm.innerHTML = html;
+}
+function refreshBoosterCounts() {
+  ['hammer', 'rocket', 'bomb', 'shuffle'].forEach(k => {
+    const cnt = document.getElementById('cnt-' + k);
+    const btn = document.getElementById('b-' + k);
+    if (cnt) cnt.textContent = state.boost[k] || 0;
+    if (btn) {
+      btn.classList.toggle('empty', (state.boost[k] || 0) <= 0);
+      btn.classList.toggle('armed', !!state.armed[k]);
+    }
+  });
+}
+function refreshMetersUI() {
+  for (const k of ['hammer', 'pig', 'shield']) {
+    const v = state.meter[k];
+    const fill = document.getElementById('fill-' + k);
+    const lbl = document.getElementById('label-' + k);
+    const block = document.getElementById('meter-' + k);
+    if (fill) fill.style.width = (v / METER_CAP * 100) + '%';
+    if (block) block.classList.toggle('armed', v >= METER_CAP);
+    if (lbl) {
+      if (v >= METER_CAP) { lbl.textContent = 'TAP!'; lbl.classList.add('full'); }
+      else                { lbl.textContent = v + '/' + METER_CAP; lbl.classList.remove('full'); }
+    }
+    // Booster-thumb pulses near and at charge
+    const thumb = block && block.querySelector('.booster-thumb');
+    if (thumb) {
+      thumb.classList.toggle('charged', v >= METER_CAP);
+      thumb.classList.toggle('near-charged', v >= METER_CAP * 0.7 && v < METER_CAP);
+    }
+  }
+}
+function refreshMasterBlock() {
+  const ms = getMasterState();
+  document.getElementById('masterAv').textContent = ms.bot.emoji;
+  document.getElementById('masterName').textContent = ms.bot.name.toUpperCase();
+  document.getElementById('masterPile').textContent = fmtNum(ms.pile);
+  const wrap = document.getElementById('masterBuildings');
+  wrap.innerHTML = '';
+  for (const s of ms.structures) {
+    const c = document.createElement('div');
+    c.className = 'mb-cell' + (s.smashed ? ' damaged' : '');
+    c.textContent = s.emoji;
+    wrap.appendChild(c);
+  }
+  refreshMasterTimer();
+}
+function refreshMasterTimer() {
+  const el = document.getElementById('masterTimer');
+  if (!el) return;
+  const ms = masterMillisLeft();
+  const min = Math.floor(ms / 60000);
+  const sec = Math.floor((ms % 60000) / 1000);
+  el.textContent = min + ':' + String(sec).padStart(2, '0');
+  if (ms < 1000) refreshMasterBlock();
+}
+
+/* =========================================================
+   [34] Village screen
+   ========================================================= */
+
+function getStructLevel(id) { return state.village[id] || 0; }
+function structureCost(s, level) { return s.base * Math.pow(2, level - 1); }
+function refreshVillageScreen() {
+  const theme = THEMES[state.theme];
+  const vn = document.getElementById('village-name');
+  if (vn) vn.textContent = theme.nameEmoji + ' ' + theme.name;
+  let levels = 0, max = 0;
+  for (const s of theme.structures) { levels += getStructLevel(s.id); max += 5; }
+  const vpf = document.getElementById('vp-fill');
+  if (vpf) vpf.style.width = (levels / max * 100) + '%';
+  const vpt = document.getElementById('vp-text');
+  if (vpt) vpt.textContent = levels + ' / ' + max;
+  const list = document.getElementById('struct-list');
+  if (!list) return;
+  list.innerHTML = '';
+  for (const s of theme.structures) {
+    const lvl = getStructLevel(s.id);
+    const maxed = lvl >= 5;
+    const cost = maxed ? 0 : structureCost(s, lvl + 1);
+    const stars = '★'.repeat(lvl) + '☆'.repeat(5 - lvl);
+    const card = document.createElement('div');
+    card.className = 'struct-card';
+    const action = maxed
+      ? '<div class="maxed-badge">' + t('maxed') + '</div>'
+      : '<button class="btn gold small" data-build="' + s.id + '">' + (lvl === 0 ? t('build') : t('upgrade')) + '</button>' +
+        '<div class="struct-cost">' + fmtNum(cost) + ' 💰</div>';
+    card.innerHTML =
+      '<div class="struct-icon">' + s.emoji + '</div>' +
+      '<div class="struct-info">' +
+        '<div class="struct-name">' + s.name + '</div>' +
+        '<div class="struct-lvl">' + t('lvl') + ' ' + lvl + ' / 5  <span class="stars">' + stars + '</span></div>' +
+      '</div>' +
+      '<div class="struct-action">' + action + '</div>';
+    list.appendChild(card);
+  }
+  list.querySelectorAll('[data-build]').forEach(btn => {
+    btn.addEventListener('click', () => buildStructure(btn.getAttribute('data-build')));
+  });
+}
+function buildStructure(id) {
+  const theme = THEMES[state.theme];
+  const s = theme.structures.find(x => x.id === id);
+  if (!s) return;
+  const lvl = getStructLevel(id);
+  if (lvl >= 5) return;
+  const cost = structureCost(s, lvl + 1);
+  if (state.coins < cost) { toast(t('not_enough_coins')); haptic('err'); return; }
+  state.coins -= cost;
+  state.village[id] = lvl + 1;
+  haptic('success');
+  saveState();
+  refreshAllUI();
+  let levels = 0, max = 0;
+  for (const sd of theme.structures) { levels += getStructLevel(sd.id); max += 5; }
+  if (levels >= max) setTimeout(showIslandCompleteModal, 250);
+}
+function showIslandCompleteModal() {
+  const bonus = 5000;
+  state.coins += bonus;
+  state.totalGoldEarnedEver += bonus;
+  const theme = THEMES[state.theme];
+  const html =
+    '<div class="tier-up">' +
+      '<h2>' + t('island_complete') + '</h2>' +
+      '<div class="big">' + theme.nameEmoji + '</div>' +
+      '<div class="new-name">' + theme.name + '</div>' +
+      '<div class="sub" style="margin-top:6px;">' + t('bonus_coins', { n: fmtNum(bonus) }) + '</div>' +
+      '<div class="actions"><button class="btn gold" id="ic-ok">' + t('lets_go') + '</button></div>' +
+    '</div>';
+  openModal(html);
+  haptic('success');
+  document.getElementById('ic-ok').addEventListener('click', () => { closeModal(); refreshAllUI(); });
+}
+
+/* =========================================================
+   [35] Smash / Raid mini-events
+   ========================================================= */
+
+const eventOverlay = document.getElementById('event-overlay');
+function openEvent() { eventOverlay.classList.add('show'); }
+function closeEvent() {
+  eventOverlay.classList.remove('show');
+  document.getElementById('ev-final').classList.remove('show');
+  document.getElementById('ev-done').style.display = 'none';
+  document.getElementById('ev-content').innerHTML = '';
+}
+document.getElementById('ev-done').addEventListener('click', closeEvent);
+
+function startSmash() {
+  if (state.meter.hammer < METER_CAP) return;
+  state.meter.hammer = 0;
+  refreshMetersUI();
+  haptic('heavy');
+  const ms = getMasterState();
+  document.getElementById('ev-title').textContent = t('smash');
+  document.getElementById('ev-master').textContent = ms.bot.name;
+  document.getElementById('ev-info').textContent = t('tap_to_smash');
+  const available = ms.structures.filter(s => !s.smashed);
+  const picks = [];
+  const pool = available.slice();
+  while (picks.length < 3 && pool.length > 0) {
+    picks.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  }
+  while (picks.length < 3) picks.push(ms.structures[picks.length % ms.structures.length]);
+  const content = document.getElementById('ev-content');
+  content.innerHTML = '<div class="smash-buildings">' + picks.map((p, i) =>
+    '<div class="smash-bd" data-idx="' + p.idx + '" data-smashed="' + (p.smashed ? '1' : '0') + '">' + p.emoji + '</div>'
+  ).join('') + '</div>';
+  content.querySelectorAll('.smash-bd').forEach(el => {
+    el.addEventListener('click', () => {
+      if (el.classList.contains('smashed') || el.getAttribute('data-smashed') === '1') return;
+      doSmash(ms.masterId, parseInt(el.getAttribute('data-idx'), 10), el);
+    });
+  });
+  openEvent();
+}
+function doSmash(masterId, idx, el) {
+  const ms = getMasterState();
+  const bet = effectiveBet();
+  const base = 500 + Math.floor(ms.bot.pileBase * 0.05);
+  const reward = Math.floor(base * (0.8 + Math.random() * 0.5) * bet.mult);
+  const dmg = state.masterDamage[masterId] || { smashed: [], pile: ms.pile };
+  if (!dmg.smashed.includes(idx)) dmg.smashed.push(idx);
+  dmg.pile = Math.max(0, dmg.pile - Math.floor(reward * 0.3));
+  state.masterDamage[masterId] = dmg;
+  state.coins += reward;
+  state.totalGoldEarnedEver += reward;
+  state.vaultLifetimeCoins += reward;
+  state.totalSmashEver++;
+  haptic('heavy');
+  el.classList.add('smashed');
+  setTimeout(() => {
+    const final = document.getElementById('ev-final');
+    final.textContent = '+' + fmtNum(reward) + ' 💰';
+    final.classList.add('show');
+    document.getElementById('ev-done').style.display = 'inline-flex';
+    document.getElementById('ev-done').textContent = t('continue');
+    toast(t('smashed', { n: fmtNum(reward) }));
+    bumpScore();
+    saveState();
+    refreshAllUI();
+  }, 500);
+}
+
+function startRaid() {
+  if (state.meter.pig < METER_CAP) return;
+  state.meter.pig = 0;
+  refreshMetersUI();
+  haptic('heavy');
+  const ms = getMasterState();
+  document.getElementById('ev-title').textContent = t('raid');
+  document.getElementById('ev-master').textContent = ms.bot.name;
+  document.getElementById('ev-info').textContent = t('tap_to_dig');
+  const bet = effectiveBet();
+  const piePer = Math.floor(ms.pile * (0.06 + Math.random() * 0.06)) * bet.mult;
+  const emptyIdx = Math.floor(Math.random() * 4);
+  const spots = [0,1,2,3].map(i => ({
+    idx: i, empty: i === emptyIdx,
+    reward: i === emptyIdx ? 0 : Math.floor(piePer * (0.7 + Math.random() * 0.6)),
+  }));
+  const content = document.getElementById('ev-content');
+  content.innerHTML = '<div class="raid-spots">' + spots.map(s =>
+    '<div class="raid-spot" data-spot="' + s.idx + '"></div>').join('') + '</div>';
+  let dug = 0, total = 0, hits = 0;
+  content.querySelectorAll('.raid-spot').forEach((el, i) => {
+    el.addEventListener('click', () => {
+      if (el.classList.contains('dug') || dug >= 3) return;
+      const s = spots[i];
+      dug++;
+      el.classList.add('dug');
+      if (s.empty) {
+        el.classList.add('empty');
+        el.innerHTML = '<div class="em-icon">🕳️</div><div class="reward">empty</div>';
+      } else {
+        el.innerHTML = '<div class="em-icon">💰</div><div class="reward">+' + fmtNum(s.reward) + '</div>';
+        total += s.reward; hits++;
+      }
+      haptic('med');
+      if (dug >= 3) finishRaid(ms.masterId, total, hits === 3);
+    });
+  });
+  openEvent();
+}
+function finishRaid(masterId, totalGold, perfect) {
+  state.coins += totalGold;
+  state.totalGoldEarnedEver += totalGold;
+  state.vaultLifetimeCoins += totalGold;
+  state.totalRaidEver++;
+  const dmg = state.masterDamage[masterId] || { smashed: [], pile: getCurrentMaster().bot.pileBase };
+  dmg.pile = Math.max(0, dmg.pile - totalGold);
+  state.masterDamage[masterId] = dmg;
+  haptic('success');
+  setTimeout(() => {
+    const final = document.getElementById('ev-final');
+    let txt = '+' + fmtNum(totalGold) + ' 💰';
+    if (perfect) txt = '🌟 ' + t('perfect') + '  ' + txt;
+    final.textContent = txt;
+    final.classList.add('show');
+    document.getElementById('ev-done').style.display = 'inline-flex';
+    document.getElementById('ev-done').textContent = t('continue');
+    toast(t('raided', { n: fmtNum(totalGold) }));
+    bumpScore();
+    saveState();
+    refreshAllUI();
+  }, 600);
+}
+
+document.getElementById('meter-hammer').addEventListener('click', () => {
+  if (state.meter.hammer >= METER_CAP) startSmash();
+});
+document.getElementById('meter-pig').addEventListener('click', () => {
+  if (state.meter.pig >= METER_CAP) startRaid();
+});
+document.getElementById('meter-shield').addEventListener('click', () => {
+  if (state.shieldsStocked > 0) toast(t('shield_armed') + ' ×' + state.shieldsStocked);
+});
+
+/* =========================================================
+   [36] Boosters wire-up
+   ========================================================= */
+
+function setBoosterArmed(kind, on) {
+  const el = document.getElementById('b-' + kind);
+  if (el) el.classList.toggle('armed', !!on);
+}
+function armBooster(kind) {
+  if ((state.boost[kind] || 0) <= 0) { toast('No ' + kind + ' — buy in shop'); haptic('err'); return; }
+  if (state.armed[kind]) { state.armed[kind] = false; setBoosterArmed(kind, false); return; }
+  for (const k of ['hammer', 'rocket', 'bomb']) state.armed[k] = false;
+  state.armed[kind] = true;
+  for (const k of ['hammer', 'rocket', 'bomb']) setBoosterArmed(k, state.armed[k]);
+  toast(kind.toUpperCase() + ' armed — tap a tile');
+}
+document.getElementById('b-hammer').addEventListener('click', () => armBooster('hammer'));
+document.getElementById('b-rocket').addEventListener('click', () => armBooster('rocket'));
+document.getElementById('b-bomb').addEventListener('click',   () => armBooster('bomb'));
+document.getElementById('b-shuffle').addEventListener('click', () => {
+  if ((state.boost.shuffle || 0) <= 0) { toast('No shuffle'); haptic('err'); return; }
+  state.boost.shuffle--;
+  reshuffleGrid();
+  render();
+  haptic('med');
+  saveState();
+  refreshAllUI();
+});
+
+/* =========================================================
+   [37] Bet button + bottom nav + modals
+   ========================================================= */
+
+document.getElementById('bet-btn').addEventListener('click', () => {
+  state.betIdx = (state.betIdx + 1) % BETS.length;
+  haptic('tap');
+  saveState();
+  refreshBetBtn();
+  toast(t('bet_changed', { n: BETS[state.betIdx].label }));
+});
+
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => showTab(btn.getAttribute('data-tab')));
+});
+function showTab(tab) {
+  document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+  const target = document.getElementById('screen-' + tab);
+  if (target) target.classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-tab') === tab));
+  if (tab === 'play')    { sizeCanvas(); refreshAllUI(); }
+  if (tab === 'village') refreshVillageScreen();
+  if (tab === 'shop')    renderShop();
+  if (tab === 'friends') loadLeaderboard();
+}
+
+const modalBack = document.getElementById('modal-back');
+const modalEl = document.getElementById('modal');
+function openModal(html) {
+  modalEl.innerHTML = '<div class="modal-close" id="modal-close">×</div>' + html;
+  modalBack.classList.add('show');
+  const close = document.getElementById('modal-close');
+  if (close) close.addEventListener('click', closeModal);
+}
+function closeModal() { modalBack.classList.remove('show'); }
+modalBack.addEventListener('click', (ev) => { if (ev.target === modalBack) closeModal(); });
+
+/* =========================================================
+   [38] Daily chest + welcome + settings
+   ========================================================= */
+
+function todayYMD() { const d = new Date(); return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0'); }
+function yesterdayYMD() { const d = new Date(); d.setUTCDate(d.getUTCDate() - 1); return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0'); }
+function canClaimDaily() { return state.dailyChestYMD !== todayYMD(); }
+function nextChestDay() {
+  if (state.dailyChestDay >= 7) return 1;
+  if (state.dailyChestYMD && state.dailyChestYMD !== yesterdayYMD()) return 1;
+  return state.dailyChestDay + 1;
+}
+function showDailyModal() {
+  const next = nextChestDay();
+  const claimable = canClaimDaily();
+  let cells = '';
+  for (let i = 0; i < 7; i++) {
+    const day = i + 1;
+    const item = DAILY_CHEST[i];
+    const isToday = (claimable && day === next) || (!claimable && day === state.dailyChestDay);
+    const claimedByPrior = !claimable && day < state.dailyChestDay;
+    const futureDay = claimable ? (day > next) : (day > state.dailyChestDay);
+    cells += '<div class="chest-day' + (isToday ? ' today' : '') + (claimedByPrior ? ' claimed' : '') + (futureDay ? ' future' : '') + '">' +
+      '<div class="d">' + day + '</div><div class="em">' + item.em + '</div>' +
+      '<div class="amt">+' + fmtNum(item.coins) + (item.energy ? ' ⚡' + item.energy : '') + '</div></div>';
+  }
+  const html =
+    '<h2>' + t('daily_chest') + '</h2>' +
+    '<div class="sub">' + t('daily_streak', { n: state.streak }) + '</div>' +
+    '<div class="chest-grid">' + cells + '</div>' +
+    '<div class="actions">' + (claimable
+      ? '<button class="btn gold full" id="claim-daily">' + t('claim') + ' · Day ' + next + '</button>'
+      : '<div style="text-align:center;color:#8a8ca0;font-size:13px;">' + t('come_back_tomorrow') + '</div>') + '</div>';
+  openModal(html);
+  if (claimable) {
+    document.getElementById('claim-daily').addEventListener('click', () => { claimDaily(); closeModal(); });
+  }
+}
+function claimDaily() {
+  if (!canClaimDaily()) return;
+  const next = nextChestDay();
+  const item = DAILY_CHEST[next - 1];
+  if (state.dailyChestYMD === yesterdayYMD()) state.streak = (state.streak || 0) + 1;
+  else state.streak = 1;
+  state.coins += item.coins;
+  state.totalGoldEarnedEver += item.coins;
+  state.vaultLifetimeCoins += item.coins;
+  if (item.energy) state.energy = Math.min(state.energyMax + item.energy, state.energy + item.energy);
+  state.dailyChestYMD = todayYMD();
+  state.dailyChestDay = next;
+  haptic('success');
+  bumpScore();
+  saveState();
+  refreshAllUI();
+  toast('+' + fmtNum(item.coins) + ' 💰' + (item.energy ? ' +' + item.energy + ' ⚡' : ''));
+}
+
+function showWelcomeModal() {
+  const html =
+    '<h2>' + t('welcome_title') + '</h2>' +
+    '<div class="welcome-grid">' +
+      '<div class="em">💰</div><div><span class="lbl">Match</span><br>' + t('welcome_match') + '</div>' +
+      '<div class="em">⚡</div><div><span class="lbl">Cascade</span><br>' + t('welcome_cascade') + '</div>' +
+      '<div class="em">🔨</div><div><span class="lbl">Steal</span><br>' + t('welcome_charge') + '</div>' +
+      '<div class="em">🏠</div><div><span class="lbl">Village</span><br>' + t('welcome_village') + '</div>' +
+    '</div>' +
+    '<div class="actions"><button class="btn gold full" id="wel-ok">' + t('lets_go') + '</button></div>';
+  openModal(html);
+  document.getElementById('wel-ok').addEventListener('click', () => {
+    state.welcomed = true; saveState(); closeModal();
+  });
+}
+
+function showSettingsModal() {
+  const html =
+    '<h2>' + t('settings') + '</h2>' +
+    '<div style="font-size:12px;color:#c7cdd9;margin-bottom:6px;letter-spacing:1px;text-transform:uppercase;font-weight:800;">' + t('language') + '</div>' +
+    '<div class="lang-grid" id="lang-grid"></div>' +
+    '<div style="text-align:center;font-size:11px;color:#5a4ab0;margin-top:10px;">' + VERSION + '</div>';
+  openModal(html);
+  const grid = document.getElementById('lang-grid');
+  for (const l of LANGS) {
+    const cell = document.createElement('div');
+    cell.className = 'lang-cell' + (l.code === state.lang ? ' active' : '');
+    cell.innerHTML = '<span class="flag">' + l.flag + '</span>' + l.name;
+    cell.addEventListener('click', () => {
+      state.lang = l.code; saveState(); applyI18n(); refreshAllUI(); closeModal();
+      setTimeout(showSettingsModal, 80);
+    });
+    grid.appendChild(cell);
+  }
+}
+
+// Daily button (the center RULES button repurposed) opens daily chest
+document.getElementById('rules-btn').addEventListener('click', showDailyModal);
+// Master avatar long-press = settings (placeholder for v0.4)
+document.getElementById('playerAv').addEventListener('click', showSettingsModal);
+
+/* =========================================================
+   [39] Shop + leaderboard
+   ========================================================= */
+
+function renderShop() {
+  const items = (SKUS && SKUS.length) ? SKUS.map(s => ({
+    id: s.id, ico: shopIcon(s.id), title: s.title, desc: s.description, price: s.price,
+    featured: s.id === 'starter_pack',
+  })) : STAR_SHOP_FALLBACK;
+  const list = document.getElementById('shop-list');
+  if (!list) return;
+  list.innerHTML = '';
+  for (const it of items) {
+    const card = document.createElement('div');
+    card.className = 'shop-item' + (it.featured ? ' featured' : '');
+    card.innerHTML =
+      '<div class="ico">' + it.ico + '</div>' +
+      '<div class="info"><div class="ti">' + it.title + '</div><div class="desc">' + it.desc + '</div></div>' +
+      '<div class="price">' + it.price + ' ⭐</div>';
+    card.addEventListener('click', () => buySku(it.id));
+    list.appendChild(card);
+  }
+  if (!IAP_ENABLED) {
+    const note = document.createElement('div');
+    note.style.cssText = 'font-size:11px;color:#8a8ca0;text-align:center;margin:8px 0;padding:8px;background:rgba(20,12,40,0.7);border-radius:9px;border:1.5px solid #3a2a6a;';
+    note.textContent = t('no_iap');
+    list.appendChild(note);
+  }
+}
+function shopIcon(id) {
+  const m = { starter_pack:'🎁', coins_small:'💰', coins_medium:'💰', coins_large:'💰', coins_mega:'💰',
+              energy_refill:'⚡', energy_full:'⚡', hammer_pack:'🔨', rocket_pack:'🚀', bomb_pack:'💣',
+              shuffle_pack:'🔄', free_pack:'⚡⚡', shield_24h:'🛡️', battle_pass:'⭐', test_purchase:'🧪',
+              bet_booster:'⚡', wild_booster:'🎰', bag_booster:'💰' };
+  return m[id] || '💎';
+}
+
+let lbMode = 'regular';
+async function loadLeaderboard() {
+  try {
+    const r = await fetch('/api/leaderboard?mode=' + lbMode);
+    const d = await r.json();
+    renderLeaderboard(d.top || []);
+  } catch (e) { document.getElementById('lb-list').textContent = '—'; }
+}
+function renderLeaderboard(top) {
+  const list = document.getElementById('lb-list');
+  if (!list) return;
+  if (!top.length) { list.textContent = 'Be the first on the board!'; return; }
+  const myId = (TG && TG.initDataUnsafe && TG.initDataUnsafe.user && TG.initDataUnsafe.user.id) || null;
+  list.innerHTML = top.slice(0, 50).map((e, i) =>
+    '<div class="lb-row' + (myId && e.uid === myId ? ' me' : '') + '">' +
+      '<div class="rank">' + (i + 1) + '</div>' +
+      '<div class="name">' + escapeHtml(e.name) + (myId && e.uid === myId ? ' (you)' : '') + '</div>' +
+      '<div class="score">' + fmtNum(e.score) + ' 💰</div></div>').join('');
+}
+function escapeHtml(s) { return String(s || '').replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[ch])); }
+document.querySelectorAll('.lb-tab').forEach(el => {
+  el.addEventListener('click', () => {
+    lbMode = el.getAttribute('data-m');
+    document.querySelectorAll('.lb-tab').forEach(x => x.classList.toggle('active', x === el));
+    loadLeaderboard();
+  });
+});
+
+/* =========================================================
+   [40] Toast + boot
+   ========================================================= */
+
+let toastTimer = 0;
+function toast(msg) {
+  const el = document.getElementById('toast-el');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.opacity = '1';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.style.opacity = '0'; }, 1900);
+}
+
+(async function boot() {
+  tgReady();
+  applyI18n();
+  pruneOldMasterDamage();
+  spawnFreshGrid();
+  sizeCanvas();
+  refreshAllUI();
+  // Kick the main render loop — runs every frame for animations + particles.
+  requestAnimationFrame(tick);
+
+  if (!state.welcomed) setTimeout(showWelcomeModal, 350);
+  else if (canClaimDaily()) setTimeout(showDailyModal, 500);
+
+  await fetchServerFlags();
+  if (TG && TG.initData) {
+    try {
+      const r = await fetch('/api/state/load', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData: TG.initData }),
+      });
+      const d = await r.json();
+      if (d.exists && d.state) { Object.assign(state, d.state); saveState(); refreshAllUI(); }
+    } catch (e) {}
+  }
+  setInterval(pollPurchases, 5000);
+  if (TG && TG.initData) {
+    fetch('/api/heartbeat', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: TG.initData, lang: state.lang, streak: state.streak }),
+    }).catch(() => {});
+  }
+})();
+
+</script>
+</body>
+</html>

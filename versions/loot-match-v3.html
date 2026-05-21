@@ -1,0 +1,3305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+<meta name="theme-color" content="#7ecbff" />
+<title>Loot Match · Match · Cascade · Steal</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  /* =========================================================
+     [01] Palette — bright candy-crush
+     ========================================================= */
+  :root {
+    --sky-top:        #7ecbff;
+    --sky-mid:        #9adfff;
+    --sky-bottom:     #ffd86b;
+    --cloud:          #ffffff;
+    --tile-bg:        #fff5e1;
+    --tile-bg-2:      #ffeac2;
+    --ink:            #2a1a04;
+    --ink-soft:       #5a3a14;
+    --gold:           #ffc94a;
+    --gold-deep:      #c9921a;
+    --gold-glow:      #ffe98a;
+    --gold-shadow:    #6f4d05;
+    --candy-red:      #ff5c7a;
+    --candy-pink:     #ffafd0;
+    --candy-blue:     #4fb2ff;
+    --candy-deep-blue:#2d7fd6;
+    --candy-purple:   #b878ff;
+    --candy-green:    #6cd47a;
+    --candy-orange:   #ff8c3a;
+    --shield-blue:    #4fb2ff;
+    --pig-pink:       #ff77a8;
+    --hammer-orange:  #ff8c3a;
+    --bar-bg:         rgba(0, 0, 0, 0.15);
+    --pill-bg:        rgba(255, 255, 255, 0.55);
+    --tg-safe-top:    0px;
+    --tg-safe-bottom: 0px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    height: 100%; width: 100%;
+    overflow: hidden; overscroll-behavior: none;
+    user-select: none; -webkit-user-select: none;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Lilita One", "Fredoka One", system-ui, sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(ellipse 80% 30% at 20% 90%, rgba(255, 200, 100, 0.35) 0%, transparent 60%),
+      radial-gradient(circle at 80% 12%, rgba(255, 255, 255, 0.4) 0%, transparent 30%),
+      linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 45%, var(--sky-bottom) 100%);
+    -webkit-touch-callout: none;
+  }
+  body { position: fixed; inset: 0; }
+  #app {
+    position: absolute; inset: 0;
+    padding-top: var(--tg-safe-top);
+    padding-bottom: var(--tg-safe-bottom);
+    display: flex; flex-direction: column;
+  }
+
+  /* Cloud silhouettes — purely decorative SVG-as-gradient feel */
+  #app::before, #app::after {
+    content: '';
+    position: absolute; top: 8%;
+    width: 90px; height: 30px;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 999px;
+    box-shadow:
+      30px -8px 0 -3px rgba(255, 255, 255, 0.55),
+      -22px 6px 0 -5px rgba(255, 255, 255, 0.55);
+    pointer-events: none;
+    z-index: 0;
+  }
+  #app::before { left: 8%; animation: drift1 70s linear infinite; }
+  #app::after  { right: 12%; top: 14%; animation: drift2 90s linear infinite; }
+  @keyframes drift1 {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(40vw); }
+  }
+  @keyframes drift2 {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-30vw); }
+  }
+
+  /* =========================================================
+     [02] Screen layout primitives
+     ========================================================= */
+  .screen {
+    position: absolute; inset: 0;
+    padding-top: var(--tg-safe-top);
+    padding-bottom: calc(var(--tg-safe-bottom) + 58px); /* room for bottom nav */
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    overflow: hidden;
+  }
+  .screen.active { display: flex; }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    gap: 8px;
+    background: linear-gradient(180deg, #6cd47a 0%, #4ab85a 100%);
+    color: #fff;
+    border: 3px solid #2a8a3a;
+    border-radius: 18px;
+    padding: 12px 26px;
+    font-size: 17px; font-weight: 900;
+    letter-spacing: 0.5px;
+    box-shadow: 0 5px 0 #2a8a3a, 0 8px 14px rgba(0,0,0,0.25);
+    cursor: pointer;
+    text-transform: uppercase;
+    text-shadow: 0 2px 0 rgba(0,0,0,0.15);
+    transition: transform 80ms;
+  }
+  .btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #2a8a3a, 0 4px 8px rgba(0,0,0,0.25); }
+  .btn.gold {
+    background: linear-gradient(180deg, var(--gold-glow) 0%, var(--gold) 50%, var(--gold-deep) 100%);
+    color: var(--ink);
+    border-color: var(--gold-shadow);
+    box-shadow: 0 5px 0 var(--gold-shadow), 0 8px 14px rgba(0,0,0,0.25);
+    text-shadow: 0 1px 0 rgba(255,255,255,0.4);
+  }
+  .btn.gold:active { box-shadow: 0 2px 0 var(--gold-shadow); }
+  .btn.red {
+    background: linear-gradient(180deg, #ff8aa0 0%, #ff5c7a 50%, #c8344f 100%);
+    color: #fff;
+    border-color: #7a1d2f;
+    box-shadow: 0 5px 0 #7a1d2f, 0 8px 14px rgba(0,0,0,0.25);
+  }
+  .btn.red:active { box-shadow: 0 2px 0 #7a1d2f; }
+  .btn.ghost {
+    background: rgba(255, 255, 255, 0.85);
+    color: var(--ink);
+    border-color: rgba(0,0,0,0.2);
+    box-shadow: 0 3px 0 rgba(0,0,0,0.2), 0 4px 10px rgba(0,0,0,0.15);
+    text-transform: none;
+  }
+  .btn.ghost:active { box-shadow: 0 1px 0 rgba(0,0,0,0.2); }
+  .btn.full { width: 100%; }
+  .btn.small { padding: 8px 14px; font-size: 13px; border-radius: 12px; box-shadow: 0 3px 0 #2a8a3a, 0 4px 8px rgba(0,0,0,0.2); }
+
+  /* =========================================================
+     [03] Top bar — coin pill + small gear icons
+     ========================================================= */
+  .topbar {
+    width: 100%;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 12px;
+    z-index: 30;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--pill-bg);
+    color: var(--ink);
+    border-radius: 999px; padding: 7px 14px;
+    font-weight: 900; font-size: 15px;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.15), 0 5px 10px rgba(0,0,0,0.15);
+    border: 2px solid #fff;
+  }
+  .pill.gold {
+    background: linear-gradient(180deg, var(--gold-glow), var(--gold));
+    border-color: #fff;
+  }
+  .pill .em { font-size: 16px; line-height: 1; }
+  .pill .num { font-variant-numeric: tabular-nums; }
+  .topbar .left, .topbar .right { display: flex; gap: 6px; align-items: center; }
+  .gear {
+    width: 36px; height: 36px;
+    background: rgba(255,255,255,0.85);
+    color: var(--ink);
+    border-radius: 50%;
+    border: 2px solid #fff;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 17px; cursor: pointer;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.18), 0 5px 10px rgba(0,0,0,0.15);
+  }
+  .gear:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,0.18); }
+
+  /* =========================================================
+     [04] Match Master block + charge meters
+     ========================================================= */
+  .master-block {
+    width: calc(100% - 16px);
+    margin: 4px 8px 6px 8px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,255,255,0.78));
+    border: 3px solid #fff;
+    border-radius: 18px;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.15), 0 6px 14px rgba(0,0,0,0.18);
+    padding: 8px 10px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 5;
+  }
+  .master-row {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 6px;
+  }
+  .master-avatar {
+    width: 52px; height: 52px;
+    background: linear-gradient(180deg, var(--candy-blue), var(--candy-deep-blue));
+    border: 3px solid #fff;
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 30px;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.2), 0 5px 8px rgba(0,0,0,0.2);
+    flex-shrink: 0;
+  }
+  .master-info { flex: 1; min-width: 0; }
+  .master-label {
+    font-size: 9px; font-weight: 900;
+    color: var(--candy-red); letter-spacing: 2px;
+    line-height: 1;
+  }
+  .master-name {
+    font-size: 16px; font-weight: 900;
+    color: var(--ink);
+    line-height: 1.1;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .master-meta {
+    font-size: 11px; color: var(--ink-soft);
+    margin-top: 2px;
+    line-height: 1;
+  }
+  .master-meta .gold-amt {
+    color: var(--gold-deep); font-weight: 900;
+  }
+  .master-rot {
+    font-size: 9px; font-weight: 800; color: var(--ink-soft);
+    text-align: right;
+    line-height: 1.2;
+    min-width: 50px;
+  }
+  .master-rot .timer {
+    font-variant-numeric: tabular-nums;
+    color: var(--candy-deep-blue);
+    font-size: 11px;
+  }
+  /* Mini-buildings row inside master block */
+  .master-buildings {
+    display: flex; gap: 4px;
+    margin-top: 4px;
+    justify-content: center;
+  }
+  .mb-cell {
+    width: 26px; height: 26px;
+    background: var(--tile-bg);
+    border: 2px solid var(--ink);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+    box-shadow: 0 2px 0 rgba(0,0,0,0.25);
+  }
+  .mb-cell.damaged {
+    background: #555;
+    filter: grayscale(1) brightness(0.7);
+    box-shadow: 0 1px 0 rgba(0,0,0,0.3);
+  }
+  .mb-cell.damaged::after {
+    content: '💥';
+    position: absolute;
+    margin-top: -8px;
+    font-size: 14px;
+  }
+  /* Charge meters row */
+  .meters {
+    display: flex; flex-direction: column; gap: 4px;
+    margin-top: 6px;
+  }
+  .meter {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(0,0,0,0.06);
+    border-radius: 999px;
+    padding: 3px 8px 3px 4px;
+    font-size: 11px;
+    font-weight: 900;
+    color: var(--ink);
+    position: relative;
+  }
+  .meter .em {
+    width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .meter.hammer .em { background: linear-gradient(180deg, #ffb285, var(--hammer-orange)); }
+  .meter.pig    .em { background: linear-gradient(180deg, #ffafce, var(--pig-pink)); }
+  .meter.shield .em { background: linear-gradient(180deg, #8ed0ff, var(--shield-blue)); }
+  .meter-bar {
+    flex: 1;
+    height: 12px;
+    background: rgba(255,255,255,0.55);
+    border-radius: 999px;
+    overflow: hidden;
+    border: 2px solid #fff;
+    box-shadow: inset 0 2px 3px rgba(0,0,0,0.15);
+  }
+  .meter-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--candy-orange) 0%, var(--gold) 100%);
+    width: 0%;
+    transition: width 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 0 10px rgba(255,201,74,0.6);
+  }
+  .meter.hammer .meter-fill { background: linear-gradient(90deg, #ffa56b, var(--hammer-orange)); }
+  .meter.pig    .meter-fill { background: linear-gradient(90deg, #ff9cc1, var(--pig-pink)); }
+  .meter.shield .meter-fill { background: linear-gradient(90deg, #79c2ff, var(--shield-blue)); }
+  .meter-num { font-variant-numeric: tabular-nums; min-width: 32px; text-align: right; }
+  .meter.ready {
+    animation: readyPulse 800ms ease-in-out infinite;
+    cursor: pointer;
+  }
+  .meter.ready .meter-num {
+    color: #fff;
+    background: var(--candy-red);
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+  @keyframes readyPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,92,122,0.6); }
+    50%      { box-shadow: 0 0 0 6px rgba(255,92,122,0); }
+  }
+
+  /* =========================================================
+     [05] Per-match gold display
+     ========================================================= */
+  .gold-strip {
+    width: calc(100% - 16px);
+    margin: 4px 8px 0 8px;
+    height: 36px;
+    background: linear-gradient(180deg, var(--gold-glow), var(--gold));
+    border: 3px solid #fff;
+    border-radius: 18px;
+    box-shadow: 0 3px 0 var(--gold-shadow), 0 5px 10px rgba(0,0,0,0.15);
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px;
+    font-size: 15px; font-weight: 900;
+    color: var(--ink);
+    text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+    flex-shrink: 0;
+    z-index: 5;
+    position: relative;
+  }
+  .gold-strip .amount {
+    font-size: 19px;
+    font-variant-numeric: tabular-nums;
+    transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .gold-strip .amount.pulse { transform: scale(1.18); }
+  .gold-strip .cascade {
+    margin-left: 6px;
+    padding: 2px 10px;
+    background: var(--candy-red);
+    color: #fff;
+    border-radius: 999px;
+    font-size: 11px;
+    letter-spacing: 1px;
+    opacity: 0;
+    transition: opacity 180ms;
+    text-shadow: none;
+  }
+  .gold-strip .cascade.show { opacity: 1; }
+  .gold-strip .cascade.mega {
+    background: linear-gradient(90deg, var(--candy-red), var(--candy-purple), var(--candy-blue), var(--gold));
+    background-size: 200% 100%;
+    animation: megaCascadeShift 1.2s linear infinite;
+  }
+  @keyframes megaCascadeShift {
+    from { background-position: 0% 0; }
+    to   { background-position: 100% 0; }
+  }
+
+  /* =========================================================
+     [06] Grid canvas — bright candy tile look
+     ========================================================= */
+  #canvas-wrap {
+    flex: 1 1 auto;
+    width: 100%;
+    display: flex; justify-content: center; align-items: center;
+    padding: 6px 4px;
+    min-height: 0;
+    position: relative;
+  }
+  #board {
+    display: block;
+    background: transparent;
+    touch-action: none;
+    filter: drop-shadow(0 6px 0 rgba(0,0,0,0.12));
+  }
+  /* Floating "+N" rising toward the gold strip */
+  .float-coin {
+    position: absolute;
+    pointer-events: none;
+    font-weight: 900;
+    color: #fff;
+    text-shadow:
+      0 2px 0 var(--gold-deep),
+      0 3px 6px rgba(0,0,0,0.4);
+    font-size: 18px;
+    z-index: 40;
+    font-variant-numeric: tabular-nums;
+    transition:
+      transform 700ms cubic-bezier(0.34, 1.56, 0.64, 1),
+      opacity 700ms ease-out;
+  }
+  /* Mega cascade splash */
+  .mega-splash {
+    position: absolute; inset: 0;
+    z-index: 60;
+    display: none;
+    align-items: center; justify-content: center;
+    pointer-events: none;
+  }
+  .mega-splash.show { display: flex; }
+  .mega-splash .txt {
+    font-size: 52px; font-weight: 900;
+    background: linear-gradient(90deg, var(--candy-red), var(--gold), var(--candy-purple), var(--candy-blue), var(--candy-red));
+    background-size: 200% 100%;
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+    animation: megaPulse 600ms ease-out, megaCascadeShift 1.2s linear infinite 600ms;
+    filter: drop-shadow(0 4px 0 rgba(0,0,0,0.4)) drop-shadow(0 8px 20px rgba(255,201,74,0.6));
+    text-align: center;
+    letter-spacing: 2px;
+    line-height: 1.0;
+  }
+  @keyframes megaPulse {
+    0%   { opacity: 0; transform: scale(0.5); }
+    50%  { opacity: 1; transform: scale(1.25); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+
+  /* =========================================================
+     [07] Energy row + bet
+     ========================================================= */
+  .energy-row {
+    width: calc(100% - 16px);
+    margin: 4px 8px 0 8px;
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, 0.78);
+    border: 2px solid #fff;
+    border-radius: 14px;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.15);
+    font-size: 13px;
+    font-weight: 900;
+    flex-shrink: 0;
+    z-index: 5;
+  }
+  .energy-icon { font-size: 18px; }
+  .energy-bar {
+    flex: 1;
+    height: 12px;
+    background: rgba(0,0,0,0.12);
+    border-radius: 999px;
+    overflow: hidden;
+    border: 2px solid #fff;
+    box-shadow: inset 0 2px 3px rgba(0,0,0,0.15);
+  }
+  .energy-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--candy-blue), #79c2ff, var(--gold));
+    transition: width 300ms ease;
+    box-shadow: 0 0 8px rgba(79,178,255,0.5);
+  }
+  .energy-num {
+    color: var(--candy-deep-blue);
+    font-variant-numeric: tabular-nums;
+    min-width: 48px;
+    text-align: right;
+  }
+  .energy-row.empty .energy-num { color: var(--candy-red); }
+  .energy-row.empty .energy-fill { background: var(--candy-red); }
+  .energy-timer {
+    color: var(--ink-soft);
+    font-size: 10px;
+    font-weight: 800;
+    min-width: 32px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .bet-btn {
+    display: inline-flex; align-items: center;
+    background: linear-gradient(180deg, var(--gold-glow), var(--gold));
+    border: 2px solid #fff;
+    border-radius: 12px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 900;
+    color: var(--ink);
+    cursor: pointer;
+    box-shadow: 0 3px 0 var(--gold-shadow), 0 4px 8px rgba(0,0,0,0.15);
+    text-shadow: 0 1px 0 rgba(255,255,255,0.4);
+    min-width: 56px;
+    justify-content: center;
+    gap: 3px;
+  }
+  .bet-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--gold-shadow); }
+  .bet-btn .x { color: var(--candy-red); font-size: 13px; }
+
+  /* =========================================================
+     [08] Booster row
+     ========================================================= */
+  .booster-row {
+    width: calc(100% - 16px);
+    margin: 4px 8px 0 8px;
+    display: flex; align-items: center; justify-content: center;
+    gap: 6px;
+    flex-shrink: 0;
+    z-index: 5;
+  }
+  .booster {
+    width: 50px; height: 50px;
+    background: linear-gradient(180deg, #ffffff, #f0e7d0);
+    border: 3px solid #fff;
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    cursor: pointer;
+    position: relative;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.2), 0 5px 10px rgba(0,0,0,0.2);
+    transition: transform 80ms;
+  }
+  .booster:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,0.2); }
+  .booster.armed {
+    background: linear-gradient(180deg, var(--gold-glow), var(--gold));
+    border-color: var(--gold-deep);
+    animation: armedPulse 1s ease-in-out infinite;
+  }
+  @keyframes armedPulse {
+    0%, 100% { box-shadow: 0 4px 0 rgba(0,0,0,0.2), 0 0 0 0 rgba(255,201,74,0.7); }
+    50%      { box-shadow: 0 4px 0 rgba(0,0,0,0.2), 0 0 0 8px rgba(255,201,74,0); }
+  }
+  .booster .cnt {
+    position: absolute; top: -6px; right: -6px;
+    background: var(--candy-red);
+    color: #fff;
+    font-size: 10px; font-weight: 900;
+    padding: 2px 6px; border-radius: 999px;
+    min-width: 18px; text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+    border: 1.5px solid #fff;
+  }
+  .booster.empty { opacity: 0.55; }
+  .booster.empty .cnt { background: #999; }
+
+  /* =========================================================
+     [09] Bottom nav
+     ========================================================= */
+  .bottom-nav {
+    position: absolute;
+    bottom: var(--tg-safe-bottom); left: 0; right: 0;
+    height: 58px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.85));
+    border-top: 3px solid #fff;
+    display: flex;
+    z-index: 40;
+    box-shadow: 0 -4px 12px rgba(0,0,0,0.2);
+  }
+  .nav-btn {
+    flex: 1;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 2px;
+    cursor: pointer;
+    font-size: 22px;
+    color: var(--ink-soft);
+    position: relative;
+  }
+  .nav-btn .lbl {
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-weight: 900;
+  }
+  .nav-btn.active {
+    color: var(--candy-red);
+  }
+  .nav-btn.active::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 30%; right: 30%;
+    height: 3px;
+    background: var(--candy-red);
+    border-radius: 0 0 3px 3px;
+  }
+  .nav-btn .badge {
+    position: absolute;
+    top: 4px; right: 22%;
+    background: var(--candy-red);
+    color: #fff;
+    border-radius: 999px;
+    padding: 1px 5px;
+    font-size: 9px;
+    font-weight: 900;
+    border: 1.5px solid #fff;
+    min-width: 14px;
+    text-align: center;
+  }
+
+  /* =========================================================
+     [10] Village screen
+     ========================================================= */
+  .village-wrap {
+    flex: 1;
+    width: 100%;
+    padding: 8px 12px;
+    overflow-y: auto;
+  }
+  .village-header {
+    text-align: center;
+    margin-bottom: 12px;
+    margin-top: 4px;
+  }
+  .village-header .name {
+    font-size: 22px; font-weight: 900;
+    color: var(--ink);
+    text-shadow: 0 2px 0 rgba(255,255,255,0.6);
+  }
+  .village-header .sub {
+    font-size: 12px; color: var(--ink-soft);
+    margin-top: 2px;
+  }
+  .village-progress {
+    background: rgba(255,255,255,0.85);
+    border: 2px solid #fff;
+    border-radius: 14px;
+    padding: 8px;
+    margin-bottom: 14px;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.15);
+  }
+  .village-progress .vp-bar {
+    height: 14px;
+    background: rgba(0,0,0,0.1);
+    border-radius: 999px;
+    overflow: hidden;
+    border: 2px solid #fff;
+    box-shadow: inset 0 2px 3px rgba(0,0,0,0.1);
+  }
+  .village-progress .vp-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--candy-green), var(--gold));
+    width: 0%;
+    transition: width 400ms ease;
+  }
+  .village-progress .vp-lbl {
+    display: flex; justify-content: space-between;
+    font-size: 11px; font-weight: 800;
+    margin-top: 4px;
+    color: var(--ink-soft);
+  }
+
+  .struct-card {
+    background: rgba(255,255,255,0.92);
+    border: 3px solid #fff;
+    border-radius: 16px;
+    padding: 10px;
+    margin-bottom: 8px;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.15), 0 5px 10px rgba(0,0,0,0.15);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .struct-card.damaged { border-color: var(--candy-red); }
+  .struct-icon {
+    width: 56px; height: 56px;
+    background: var(--tile-bg);
+    border: 2px solid var(--ink);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 30px;
+    flex-shrink: 0;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.2);
+    position: relative;
+  }
+  .struct-icon.damaged::after {
+    content: '💥';
+    position: absolute;
+    top: -4px; right: -4px;
+    font-size: 18px;
+  }
+  .struct-info { flex: 1; min-width: 0; }
+  .struct-name {
+    font-size: 14px; font-weight: 900;
+    color: var(--ink);
+  }
+  .struct-lvl {
+    font-size: 11px; color: var(--ink-soft);
+    margin-top: 2px;
+  }
+  .struct-lvl .stars {
+    color: var(--gold-deep);
+    letter-spacing: 1px;
+  }
+  .struct-action {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 2px;
+  }
+  .struct-action .cost {
+    font-size: 11px;
+    color: var(--gold-deep);
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+  }
+  .struct-action .maxed {
+    background: var(--candy-green);
+    color: #fff;
+    padding: 6px 10px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 900;
+    border: 2px solid #fff;
+    letter-spacing: 1px;
+  }
+
+  /* =========================================================
+     [11] Shop / Friends screens
+     ========================================================= */
+  .shop-wrap, .friends-wrap {
+    flex: 1; width: 100%;
+    padding: 8px 12px;
+    overflow-y: auto;
+  }
+  .section-title {
+    text-align: center;
+    font-size: 20px; font-weight: 900;
+    margin: 6px 0 8px 0;
+    color: var(--ink);
+    text-shadow: 0 2px 0 rgba(255,255,255,0.5);
+  }
+  .shop-item {
+    background: rgba(255,255,255,0.92);
+    border: 3px solid #fff;
+    border-radius: 16px;
+    padding: 10px;
+    margin-bottom: 7px;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.15);
+    display: flex; align-items: center; gap: 10px;
+    cursor: pointer;
+  }
+  .shop-item:active { transform: scale(0.98); }
+  .shop-item.featured {
+    border-color: var(--gold);
+    background: linear-gradient(180deg, rgba(255,233,138,0.95), rgba(255,201,74,0.85));
+  }
+  .shop-item .ico { font-size: 30px; min-width: 44px; text-align: center; }
+  .shop-item .info { flex: 1; min-width: 0; }
+  .shop-item .ti { font-size: 14px; font-weight: 900; color: var(--ink); }
+  .shop-item .desc { font-size: 11px; color: var(--ink-soft); margin-top: 2px; line-height: 1.3; }
+  .shop-item .price {
+    background: var(--candy-red);
+    color: #fff;
+    padding: 7px 12px; border-radius: 12px;
+    font-size: 13px; font-weight: 900;
+    white-space: nowrap;
+    border: 2px solid #fff;
+    box-shadow: 0 3px 0 #7a1d2f;
+  }
+
+  /* Leaderboard */
+  .lb-tabs {
+    display: flex; gap: 4px; margin-bottom: 10px;
+    background: rgba(255,255,255,0.5);
+    border: 2px solid #fff;
+    border-radius: 12px;
+    padding: 3px;
+  }
+  .lb-tab {
+    flex: 1; padding: 7px;
+    text-align: center;
+    font-size: 11px; font-weight: 900;
+    letter-spacing: 1px; text-transform: uppercase;
+    border-radius: 9px;
+    cursor: pointer;
+    color: var(--ink-soft);
+  }
+  .lb-tab.active {
+    background: var(--candy-red);
+    color: #fff;
+    box-shadow: 0 2px 0 #7a1d2f;
+  }
+  .lb-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.85);
+    border-radius: 12px;
+    margin-bottom: 4px;
+    font-size: 13px;
+    border: 2px solid #fff;
+  }
+  .lb-row.me { background: linear-gradient(180deg, var(--gold-glow), var(--gold)); }
+  .lb-row .rank {
+    width: 28px; text-align: center;
+    font-weight: 900; color: var(--candy-red);
+    font-variant-numeric: tabular-nums;
+  }
+  .lb-row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 800; }
+  .lb-row .score { color: var(--gold-deep); font-weight: 900; font-variant-numeric: tabular-nums; }
+
+  /* =========================================================
+     [12] Modals — generic overlay
+     ========================================================= */
+  .modal-back {
+    position: absolute; inset: 0;
+    background: rgba(20, 12, 38, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+    display: none;
+    align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .modal-back.show { display: flex; }
+  .modal {
+    position: relative;
+    background: linear-gradient(180deg, #fff5e1 0%, #ffeac2 100%);
+    border: 3px solid #fff;
+    border-radius: 22px;
+    padding: 24px 18px 18px 18px;
+    max-width: 360px; width: 100%;
+    max-height: 86vh; overflow-y: auto;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.6),
+                inset 0 0 0 3px var(--gold);
+  }
+  .modal h2 {
+    margin: 0 0 6px 0;
+    font-size: 24px; font-weight: 900;
+    color: var(--ink);
+    text-align: center;
+    text-shadow: 0 2px 0 rgba(255,255,255,0.6);
+  }
+  .modal .sub {
+    text-align: center;
+    font-size: 13px; color: var(--ink-soft);
+    margin-bottom: 12px;
+  }
+  .modal-close {
+    position: absolute; top: 8px; right: 8px;
+    width: 32px; height: 32px;
+    background: rgba(255,255,255,0.85);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--ink); font-size: 19px;
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 0 rgba(0,0,0,0.18);
+    z-index: 2;
+    font-weight: 900;
+  }
+  .modal .actions {
+    display: flex; flex-direction: column; gap: 10px;
+    margin-top: 12px;
+  }
+
+  /* =========================================================
+     [13] Smash / Raid mini-event overlays
+     ========================================================= */
+  .event-overlay {
+    position: absolute; inset: 0;
+    z-index: 120;
+    display: none;
+    flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 20px;
+    background:
+      radial-gradient(ellipse at center, rgba(255,201,74,0.35) 0%, transparent 70%),
+      rgba(20, 12, 38, 0.85);
+    backdrop-filter: blur(2px);
+  }
+  .event-overlay.show { display: flex; }
+  .event-overlay .ev-title {
+    font-size: 32px;
+    font-weight: 900;
+    color: #fff;
+    text-shadow:
+      0 3px 0 var(--candy-red),
+      0 5px 0 rgba(0,0,0,0.4);
+    margin-bottom: 12px;
+    letter-spacing: 1px;
+  }
+  .event-overlay .ev-master {
+    font-size: 14px;
+    color: #fff;
+    font-weight: 800;
+    margin-bottom: 16px;
+    background: rgba(0,0,0,0.4);
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 2px solid rgba(255,255,255,0.4);
+  }
+  .smash-buildings {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .smash-bd {
+    width: 80px; height: 80px;
+    background: var(--tile-bg);
+    border: 4px solid var(--ink);
+    border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 44px;
+    box-shadow: 0 5px 0 var(--ink), 0 8px 12px rgba(0,0,0,0.4);
+    cursor: pointer;
+    position: relative;
+    transition: transform 80ms;
+  }
+  .smash-bd:active { transform: scale(0.94); }
+  .smash-bd.smashed {
+    filter: grayscale(1) brightness(0.5);
+    pointer-events: none;
+    transform: scale(0.92);
+  }
+  .smash-bd.smashed::after {
+    content: '💥';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center; justify-content: center;
+    font-size: 50px;
+    animation: bonk 400ms ease-out;
+  }
+  @keyframes bonk {
+    0%   { transform: scale(0); }
+    60%  { transform: scale(1.3); }
+    100% { transform: scale(1); }
+  }
+  /* Raid dig spots */
+  .raid-spots {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+  .raid-spot {
+    width: 110px; height: 110px;
+    background:
+      radial-gradient(circle at 50% 70%, #6b4824 0%, #4a2e12 100%);
+    border: 4px solid #2a1a04;
+    border-radius: 18px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 36px;
+    box-shadow: 0 5px 0 #2a1a04, 0 8px 12px rgba(0,0,0,0.4),
+                inset 0 -8px 16px rgba(0,0,0,0.4);
+    cursor: pointer;
+    position: relative;
+    color: #fff;
+    transition: transform 80ms;
+  }
+  .raid-spot:active { transform: scale(0.94); }
+  .raid-spot::before {
+    content: '⛏️';
+    font-size: 40px;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+  }
+  .raid-spot.dug {
+    pointer-events: none;
+    background: radial-gradient(circle at 50% 50%, var(--gold-glow) 0%, var(--gold) 100%);
+    border-color: var(--gold-shadow);
+    box-shadow: 0 5px 0 var(--gold-shadow), 0 8px 12px rgba(0,0,0,0.4);
+  }
+  .raid-spot.dug::before { content: ''; }
+  .raid-spot.dug .reward {
+    font-size: 18px;
+    font-weight: 900;
+    color: var(--ink);
+    text-shadow: 0 2px 0 rgba(255,255,255,0.4);
+    font-variant-numeric: tabular-nums;
+  }
+  .raid-spot.dug.empty {
+    background: radial-gradient(circle at 50% 50%, #999 0%, #555 100%);
+    border-color: #2a1a04;
+  }
+  .raid-spot.dug.empty .reward { color: #fff; font-size: 14px; }
+  .raid-spot.dug .em-icon { font-size: 30px; }
+  .ev-info {
+    color: #fff;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 800;
+    margin-bottom: 14px;
+    background: rgba(0,0,0,0.4);
+    padding: 6px 12px;
+    border-radius: 12px;
+  }
+  .ev-info .big {
+    color: var(--gold-glow);
+    font-size: 18px;
+    font-weight: 900;
+  }
+  .ev-final {
+    background: linear-gradient(180deg, var(--gold-glow), var(--gold));
+    color: var(--ink);
+    border: 3px solid #fff;
+    border-radius: 16px;
+    padding: 12px 24px;
+    font-size: 22px;
+    font-weight: 900;
+    box-shadow: 0 4px 0 var(--gold-shadow), 0 6px 14px rgba(0,0,0,0.4);
+    margin-bottom: 14px;
+    font-variant-numeric: tabular-nums;
+    display: none;
+  }
+  .ev-final.show { display: block; }
+  .ev-actions { display: flex; gap: 10px; }
+
+  /* =========================================================
+     [14] Tutorial / welcome
+     ========================================================= */
+  .welcome-grid {
+    display: grid;
+    grid-template-columns: 38px 1fr;
+    gap: 12px 10px;
+    margin: 8px 0;
+    text-align: left;
+    font-size: 13px;
+    line-height: 1.35;
+    color: var(--ink);
+  }
+  .welcome-grid .em { font-size: 28px; text-align: center; }
+  .welcome-grid .lbl { font-weight: 900; color: var(--candy-red); }
+
+  /* Daily chest grid (modal) */
+  .chest-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 5px;
+    margin: 10px 0 12px 0;
+  }
+  .chest-day {
+    aspect-ratio: 1;
+    background: rgba(255,255,255,0.65);
+    border: 2px solid #fff;
+    border-radius: 12px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    font-size: 9px;
+    position: relative;
+    box-shadow: 0 2px 0 rgba(0,0,0,0.1);
+  }
+  .chest-day .em { font-size: 20px; }
+  .chest-day .amt { font-size: 9px; color: var(--gold-deep); font-weight: 900; }
+  .chest-day .d { position: absolute; top: 2px; left: 4px; color: var(--ink-soft); font-size: 8px; font-weight: 800; }
+  .chest-day.claimed { opacity: 0.4; }
+  .chest-day.today {
+    border-color: var(--candy-red);
+    background: linear-gradient(180deg, var(--gold-glow), var(--gold));
+    box-shadow: 0 2px 0 var(--gold-shadow), 0 0 0 3px rgba(255,92,122,0.3);
+  }
+  .chest-day.future { opacity: 0.55; }
+
+  /* Tier-up */
+  .tier-up { text-align: center; }
+  .tier-up .big {
+    font-size: 80px;
+    margin: 6px 0;
+    filter: drop-shadow(0 6px 0 rgba(0,0,0,0.2));
+  }
+  .tier-up .new-name {
+    font-size: 24px; font-weight: 900;
+    color: var(--ink);
+  }
+
+  /* Settings */
+  .lang-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    margin: 6px 0;
+  }
+  .lang-cell {
+    padding: 9px;
+    background: rgba(255,255,255,0.85);
+    border: 2px solid #fff;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 800;
+    text-align: center;
+    cursor: pointer;
+    color: var(--ink);
+  }
+  .lang-cell.active {
+    border-color: var(--candy-red);
+    background: linear-gradient(180deg, var(--gold-glow), var(--gold));
+    box-shadow: 0 2px 0 var(--gold-shadow);
+  }
+  .lang-cell .flag { font-size: 17px; margin-right: 6px; }
+
+  /* Tap-pointer hint for tutorial */
+  .tap-hint {
+    position: absolute;
+    z-index: 90;
+    font-size: 40px;
+    pointer-events: none;
+    animation: tapBounce 1s ease-in-out infinite;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.4));
+  }
+  @keyframes tapBounce {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-8px); }
+  }
+
+  /* Toast */
+  #toast-el {
+    position: absolute;
+    left: 50%; transform: translateX(-50%);
+    top: calc(var(--tg-safe-top) + 70px);
+    background: linear-gradient(180deg, #fff, #f0e7d0);
+    color: var(--ink);
+    padding: 10px 18px;
+    border-radius: 999px;
+    font-size: 13px; font-weight: 800;
+    border: 3px solid #fff;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.2), 0 6px 12px rgba(0,0,0,0.3);
+    z-index: 200;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 200ms;
+  }
+
+  /* Utility */
+  .center { text-align: center; }
+  .opacity-60 { opacity: 0.6; }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ============ PLAY SCREEN (default) ============ -->
+  <div id="screen-play" class="screen active">
+
+    <!-- Top bar -->
+    <div class="topbar">
+      <div class="left">
+        <div class="pill gold"><span class="em">💰</span><span class="num" id="hud-coins">0</span></div>
+      </div>
+      <div class="right">
+        <div class="gear" id="btn-daily" title="Daily">🎁</div>
+        <div class="gear" id="btn-settings" title="Settings">⚙️</div>
+      </div>
+    </div>
+
+    <!-- Match Master block -->
+    <div class="master-block" id="master-block">
+      <div class="master-row">
+        <div class="master-avatar" id="m-avatar">🏴‍☠️</div>
+        <div class="master-info">
+          <div class="master-label" data-i18n="match_master">MATCH MASTER</div>
+          <div class="master-name" id="m-name">Captain Pegleg</div>
+          <div class="master-meta">
+            <span class="gold-amt" id="m-pile">12,000 💰</span>
+          </div>
+        </div>
+        <div class="master-rot">
+          <div data-i18n="rotates_in">NEW IN</div>
+          <div class="timer" id="m-timer">14:32</div>
+        </div>
+      </div>
+      <div class="master-buildings" id="m-buildings"></div>
+      <div class="meters">
+        <div class="meter hammer" id="meter-hammer">
+          <div class="em">🔨</div>
+          <div class="meter-bar"><div class="meter-fill" id="fill-hammer"></div></div>
+          <div class="meter-num" id="num-hammer">0/20</div>
+        </div>
+        <div class="meter pig" id="meter-pig">
+          <div class="em">🐷</div>
+          <div class="meter-bar"><div class="meter-fill" id="fill-pig"></div></div>
+          <div class="meter-num" id="num-pig">0/20</div>
+        </div>
+        <div class="meter shield" id="meter-shield">
+          <div class="em">🛡️</div>
+          <div class="meter-bar"><div class="meter-fill" id="fill-shield"></div></div>
+          <div class="meter-num" id="num-shield">0/20</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Per-match gold strip -->
+    <div class="gold-strip">
+      <span class="em">💰</span>
+      <span data-i18n="last_match">LAST MATCH</span>
+      <span class="amount" id="last-match-num">+0</span>
+      <span class="cascade" id="last-match-cascade"></span>
+    </div>
+
+    <!-- Grid -->
+    <div id="canvas-wrap">
+      <canvas id="board" width="308" height="308"></canvas>
+      <div class="mega-splash" id="mega-splash"><div class="txt" id="mega-text">MEGA<br/>CASCADE!</div></div>
+    </div>
+
+    <!-- Energy + bet -->
+    <div class="energy-row" id="energy-row">
+      <div class="energy-icon">⚡</div>
+      <div class="energy-bar"><div class="energy-fill" id="energy-fill"></div></div>
+      <div class="energy-num"><span id="energy-num">30</span>/<span id="energy-max">30</span></div>
+      <div class="energy-timer" id="energy-timer"></div>
+      <div class="bet-btn" id="bet-btn"><span data-i18n="bet">BET</span><span class="x" id="bet-x">×1</span></div>
+    </div>
+
+    <!-- Boosters -->
+    <div class="booster-row">
+      <div class="booster" id="b-hammer">🔨<span class="cnt" id="cnt-hammer">0</span></div>
+      <div class="booster" id="b-rocket">🚀<span class="cnt" id="cnt-rocket">0</span></div>
+      <div class="booster" id="b-bomb">💣<span class="cnt" id="cnt-bomb">0</span></div>
+      <div class="booster" id="b-shuffle">🔄<span class="cnt" id="cnt-shuffle">0</span></div>
+      <div class="booster" id="b-free">⚡<span class="cnt" id="cnt-free">0</span></div>
+    </div>
+
+  </div>
+
+  <!-- ============ VILLAGE SCREEN ============ -->
+  <div id="screen-village" class="screen">
+    <div class="topbar">
+      <div class="left">
+        <div class="pill gold"><span class="em">💰</span><span class="num" id="v-hud-coins">0</span></div>
+      </div>
+      <div class="right">
+        <div class="gear" id="v-collect" title="Collect">📥</div>
+      </div>
+    </div>
+    <div class="village-wrap">
+      <div class="village-header">
+        <div class="name" id="village-name">🏴‍☠️ Pirate Cove</div>
+        <div class="sub" data-i18n="village_sub">Build & upgrade — gold from matches comes here.</div>
+      </div>
+      <div class="village-progress">
+        <div class="vp-bar"><div class="vp-fill" id="vp-fill"></div></div>
+        <div class="vp-lbl">
+          <span><span data-i18n="island_progress">Island progress</span></span>
+          <span id="vp-text">0 / 30 levels</span>
+        </div>
+      </div>
+      <div id="struct-list"></div>
+    </div>
+  </div>
+
+  <!-- ============ SHOP SCREEN ============ -->
+  <div id="screen-shop" class="screen">
+    <div class="topbar">
+      <div class="left">
+        <div class="pill gold"><span class="em">💰</span><span class="num" id="s-hud-coins">0</span></div>
+      </div>
+      <div class="right">
+        <div class="pill"><span class="em">⭐</span><span data-i18n="stars_only">STARS ONLY</span></div>
+      </div>
+    </div>
+    <div class="shop-wrap">
+      <div class="section-title" data-i18n="shop_title">Shop</div>
+      <div id="shop-list"></div>
+    </div>
+  </div>
+
+  <!-- ============ FRIENDS / SOCIAL SCREEN ============ -->
+  <div id="screen-friends" class="screen">
+    <div class="topbar">
+      <div class="left">
+        <div class="pill gold"><span class="em">💰</span><span class="num" id="f-hud-coins">0</span></div>
+      </div>
+      <div class="right">
+        <div class="gear" id="btn-share" title="Share">📤</div>
+      </div>
+    </div>
+    <div class="friends-wrap">
+      <div class="section-title" data-i18n="leaderboard">Leaderboard</div>
+      <div class="lb-tabs">
+        <div class="lb-tab active" data-m="regular" data-i18n="lb_global">Global</div>
+        <div class="lb-tab" data-m="daily" data-i18n="lb_today">Today</div>
+      </div>
+      <div id="lb-list">…</div>
+    </div>
+  </div>
+
+  <!-- ============ BOTTOM NAV ============ -->
+  <div class="bottom-nav">
+    <div class="nav-btn" data-tab="village">🏠<div class="lbl" data-i18n="nav_village">Village</div><div class="badge" id="nav-bd-village" style="display:none">!</div></div>
+    <div class="nav-btn active" data-tab="play">🎰<div class="lbl" data-i18n="nav_play">Play</div></div>
+    <div class="nav-btn" data-tab="shop">🛒<div class="lbl" data-i18n="nav_shop">Shop</div></div>
+    <div class="nav-btn" data-tab="friends">👥<div class="lbl" data-i18n="nav_friends">Friends</div></div>
+  </div>
+
+  <!-- ============ MODAL ============ -->
+  <div class="modal-back" id="modal-back">
+    <div class="modal" id="modal"></div>
+  </div>
+
+  <!-- ============ EVENT OVERLAY (smash/raid) ============ -->
+  <div class="event-overlay" id="event-overlay">
+    <div class="ev-title" id="ev-title">SMASH!</div>
+    <div class="ev-master" id="ev-master">Captain Pegleg's Cove</div>
+    <div class="ev-info" id="ev-info"><span data-i18n="tap_to_smash">Tap a building to smash it!</span></div>
+    <div id="ev-content"></div>
+    <div class="ev-final" id="ev-final"></div>
+    <div class="ev-actions"><button class="btn ghost" id="ev-done" style="display:none;">Continue</button></div>
+  </div>
+
+  <div id="toast-el"></div>
+
+</div>
+
+<script>
+'use strict';
+
+/* =========================================================
+   [20] Constants
+   ========================================================= */
+
+const VERSION = 'v0.3.0';
+
+// Board
+const BOARD_COLS = 7;
+const BOARD_ROWS = 7;
+const MIN_MATCH = 3;
+const NUM_COLORS = 5;  // 5 regular fruit/treasure tiles (theme-dependent)
+
+// Tile indexes
+const TILE = {
+  COLOR_0: 0, COLOR_1: 1, COLOR_2: 2, COLOR_3: 3, COLOR_4: 4,
+  HAMMER:  5,
+  PIG:     6,
+  SHIELD:  7,
+  MONEY_BAG: 8,
+  WILD:    9,
+  STAR:    10,
+};
+
+// Themes — Pirate Cove default. Each theme is 5 regular emojis.
+const THEMES = {
+  pirate: {
+    id: 'pirate',
+    name: 'Pirate Cove',
+    nameEmoji: '🏴‍☠️',
+    bgGradient: ['#7ecbff', '#9adfff', '#ffd86b'],
+    tiles: ['💎', '⚓', '🗡️', '💀', '🪙'],
+    structures: [
+      { id: 'lighthouse', emoji: '🗼', name: 'Lighthouse',    base: 150 },
+      { id: 'tavern',     emoji: '🏠', name: 'Tavern',        base: 250 },
+      { id: 'dock',       emoji: '⛵', name: 'Pirate Dock',   base: 400 },
+      { id: 'cabin',      emoji: '🛖', name: "Captain's Cabin", base: 700 },
+      { id: 'treasure',   emoji: '💰', name: 'Treasure Pile', base: 1100 },
+    ],
+  },
+};
+
+// Charge tiles always render with these emojis
+const TILE_EMOJI_CHARGE = { [TILE.HAMMER]: '🔨', [TILE.PIG]: '🐷', [TILE.SHIELD]: '🛡️' };
+const TILE_EMOJI_SPECIAL = { [TILE.MONEY_BAG]: '💰', [TILE.WILD]: '🎰', [TILE.STAR]: '⭐' };
+
+// Tile value
+const TILE_VALUE = {
+  [TILE.COLOR_0]: 1.0, [TILE.COLOR_1]: 1.0, [TILE.COLOR_2]: 1.0,
+  [TILE.COLOR_3]: 1.0, [TILE.COLOR_4]: 1.0,
+  [TILE.HAMMER]:    1.0, [TILE.PIG]: 1.0, [TILE.SHIELD]: 1.0,
+  [TILE.MONEY_BAG]: 5.0, [TILE.WILD]: 1.0, [TILE.STAR]:   2.0,
+};
+
+// Pastel/bright bg color per tile slot — used for the cream tile background
+// (we keep tile rects all cream, but a faint colored ring per slot helps
+// players distinguish at a glance even when emojis look similar).
+const TILE_RING = {
+  [TILE.COLOR_0]: '#ff5c7a', // red
+  [TILE.COLOR_1]: '#ffaf3a', // orange
+  [TILE.COLOR_2]: '#4ad88a', // green
+  [TILE.COLOR_3]: '#4fb2ff', // blue
+  [TILE.COLOR_4]: '#b878ff', // purple
+  [TILE.HAMMER]:  '#ff8c3a',
+  [TILE.PIG]:     '#ff77a8',
+  [TILE.SHIELD]:  '#4fb2ff',
+  [TILE.MONEY_BAG]: '#ffd86b',
+  [TILE.WILD]:    '#ffffff',
+  [TILE.STAR]:    '#ffe98a',
+};
+
+// Spawn rates for new tiles (after gravity)
+const CHARGE_SPAWN_P  = 0.10;  // each charge type ~10% — 30% total charge tiles
+const BAG_SPAWN_P     = 0.025;
+const WILD_SPAWN_P    = 0.008;
+const STAR_SPAWN_P    = 0.004;
+
+const CASCADE_MULT = [1, 1, 1.5, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0];
+
+// Bet ladder (multipliers + energy-cost-per-match)
+const BETS = [
+  { mult: 1,  cost: 1, label: '×1' },
+  { mult: 2,  cost: 2, label: '×2' },
+  { mult: 3,  cost: 3, label: '×3' },
+  { mult: 5,  cost: 5, label: '×5' },
+];
+
+// Charge meter capacity
+const METER_CAP = 20;
+
+// Energy
+const ENERGY_MAX_DEFAULT = 30;
+const ENERGY_REGEN_MS = 90 * 1000;
+
+// Match Master rotation
+const MASTER_ROTATION_MS = 30 * 60 * 1000;  // 30 min
+
+// Bot Master roster — 50 personalities
+const BOT_MASTERS = [
+  { name: 'Captain Pegleg',   emoji: '🏴‍☠️', pileBase: 12000 },
+  { name: 'Blackbeard Jr.',   emoji: '🦜', pileBase: 18000 },
+  { name: 'Mad Mary',         emoji: '🗡️', pileBase: 8500 },
+  { name: 'One-Eyed Otto',    emoji: '🎯', pileBase: 22000 },
+  { name: 'Shark-Tooth Sue',  emoji: '🦈', pileBase: 30000 },
+  { name: 'Goldbeard',        emoji: '🪙', pileBase: 45000 },
+  { name: 'Lady Doubloon',    emoji: '💃', pileBase: 60000 },
+  { name: 'Krak the Kraken',  emoji: '🐙', pileBase: 90000 },
+  { name: 'Salty Sam',        emoji: '🧂', pileBase: 5500 },
+  { name: 'Treasure Tom',     emoji: '💎', pileBase: 14000 },
+  { name: 'Cannon Carl',      emoji: '💣', pileBase: 19000 },
+  { name: 'Pirate Polly',     emoji: '🦜', pileBase: 7800 },
+  { name: 'Hook-Hand Hank',   emoji: '🪝', pileBase: 25000 },
+  { name: 'Sea Witch Wendy',  emoji: '🧙‍♀️', pileBase: 40000 },
+  { name: 'Compass Carla',    emoji: '🧭', pileBase: 11000 },
+  { name: 'Stormy Steve',     emoji: '⛈️', pileBase: 16500 },
+  { name: 'Ghost Pirate Gus', emoji: '👻', pileBase: 55000 },
+  { name: 'Lazy Larry',       emoji: '😴', pileBase: 4200 },
+  { name: 'Rusty Roger',      emoji: '⚓', pileBase: 9000 },
+  { name: 'Cap\'n Crackjaw',  emoji: '🦷', pileBase: 28000 },
+  { name: 'Cutlass Kate',     emoji: '⚔️', pileBase: 13500 },
+  { name: 'Reef-Roamer Rita', emoji: '🐠', pileBase: 21000 },
+  { name: 'Plunder Pete',     emoji: '💰', pileBase: 75000 },
+  { name: 'Sneaky Sid',       emoji: '🥷', pileBase: 17000 },
+  { name: 'Captain Coral',    emoji: '🪸', pileBase: 32000 },
+  { name: 'Drunken Dale',     emoji: '🍻', pileBase: 6700 },
+  { name: 'Brave Beatrice',   emoji: '⚓', pileBase: 23000 },
+  { name: 'Davy Jones',       emoji: '☠️', pileBase: 110000 },
+  { name: 'Pirate Princess',  emoji: '👸', pileBase: 38000 },
+  { name: 'Maroon Max',       emoji: '🌴', pileBase: 10500 },
+  { name: 'Galleon Greta',    emoji: '⛵', pileBase: 26000 },
+  { name: 'Shipwreck Shawn',  emoji: '🪦', pileBase: 19500 },
+  { name: 'Pearl Penny',      emoji: '🦪', pileBase: 15800 },
+  { name: 'Captain Crow',     emoji: '🦅', pileBase: 14200 },
+  { name: 'Stinky Steve',     emoji: '🤢', pileBase: 5100 },
+  { name: 'Calico Cal',       emoji: '🐈', pileBase: 12800 },
+  { name: 'Iron Belly Ivan',  emoji: '⚙️', pileBase: 33000 },
+  { name: 'Mutiny Molly',     emoji: '👿', pileBase: 17500 },
+  { name: 'Whisper Will',     emoji: '🫥', pileBase: 50000 },
+  { name: 'Bones McGee',      emoji: '🦴', pileBase: 8400 },
+  { name: 'Captain Quick',    emoji: '⚡', pileBase: 21500 },
+  { name: 'Marauder Mike',    emoji: '🪓', pileBase: 27000 },
+  { name: 'Lookout Lily',     emoji: '🔭', pileBase: 9800 },
+  { name: 'Anchor Anya',      emoji: '⚓', pileBase: 24500 },
+  { name: 'Tidal Tom',        emoji: '🌊', pileBase: 13800 },
+  { name: 'Crusty Carl',      emoji: '🦀', pileBase: 7300 },
+  { name: 'Smuggler Sam',     emoji: '📦', pileBase: 19800 },
+  { name: 'Pirate King Rex',  emoji: '👑', pileBase: 150000 },
+  { name: 'Daring Diana',     emoji: '🏹', pileBase: 34000 },
+  { name: 'Eternal Edith',    emoji: '🕰️', pileBase: 200000 },
+];
+
+// Daily chest
+const DAILY_CHEST = [
+  { coins: 200,   energy: 0, em: '💰' },
+  { coins: 400,   energy: 2, em: '⚡' },
+  { coins: 700,   energy: 0, em: '💎' },
+  { coins: 1200,  energy: 5, em: '⚡' },
+  { coins: 2000,  energy: 0, em: '💍' },
+  { coins: 3500,  energy: 0, em: '👑' },
+  { coins: 8000,  energy: 15, em: '🎁' },
+];
+
+// Stars catalog (fallback when server SKUs not loaded)
+const STAR_SHOP_FALLBACK = [
+  { id: 'starter_pack',  ico: '🎁', title: 'Starter Pack', desc: '10,000 coins + 5 energy + Hammer ×5', price: 199, featured: true },
+  { id: 'coins_small',   ico: '💰', title: '5,000 Coins',    desc: 'Coin Pile',           price: 99 },
+  { id: 'coins_medium',  ico: '💰', title: '20,000 Coins',   desc: '+25% bonus',          price: 299 },
+  { id: 'coins_large',   ico: '💰', title: '50,000 Coins',   desc: '+40% bonus',          price: 599 },
+  { id: 'coins_mega',    ico: '💰', title: '100,000 Coins',  desc: '+60% bonus',          price: 999 },
+  { id: 'energy_refill', ico: '⚡', title: 'Energy +5',       desc: 'Quick refill',        price: 40 },
+  { id: 'energy_full',   ico: '⚡', title: 'Energy Full',     desc: 'Instant full ⚡',     price: 199 },
+  { id: 'hammer_pack',   ico: '🔨', title: 'Hammer ×5',       desc: 'Smash 1 tile each',   price: 49 },
+  { id: 'rocket_pack',   ico: '🚀', title: 'Rocket ×5',       desc: 'Clear row + column',  price: 99 },
+  { id: 'bomb_pack',     ico: '💣', title: 'Bomb ×5',         desc: 'Clear 3×3 area',      price: 99 },
+  { id: 'shuffle_pack',  ico: '🔄', title: 'Shuffle ×5',      desc: 'Reshuffle board',     price: 49 },
+  { id: 'free_pack',     ico: '⚡⚡', title: 'Free-Spin ×5',    desc: '5 free matches',     price: 99 },
+  { id: 'shield_24h',    ico: '🛡️', title: '24h Shield',     desc: 'Block all attacks',   price: 99 },
+  { id: 'battle_pass',   ico: '⭐', title: '30-Day Pass',     desc: '2× daily, exclusive skin', price: 500 },
+];
+
+const STORAGE_KEY = 'loot-match-save-v3';
+
+/* =========================================================
+   [21] State
+   ========================================================= */
+
+const defaultState = () => ({
+  coins: 500,
+  gems: 0,
+  energy: ENERGY_MAX_DEFAULT,
+  energyMax: ENERGY_MAX_DEFAULT,
+  energyRegenAt: 0,
+  vaultLifetimeCoins: 0,
+  theme: 'pirate',
+  // Village structures: { lighthouse: level, ... }, level 0–5
+  village: {},
+  // damage state for current Master, keyed by masterId
+  masterDamage: {},
+  // count of damaged structures on user's OWN village (server-side concept,
+  // local placeholder for v0.3)
+  myVillageDamage: {},
+  // shields stocked (consumed on incoming attack — async PvP comes in v0.5)
+  shieldsStocked: 0,
+  // boosters
+  boost: { hammer: 0, rocket: 0, bomb: 0, shuffle: 0, free: 0 },
+  // charge meters
+  meter: { hammer: 0, pig: 0, shield: 0 },
+  // booster armed states
+  armed: { hammer: false, rocket: false, bomb: false },
+  // free-spin remaining matches
+  freeSpinsLeft: 0,
+  // daily
+  streak: 0,
+  dailyChestYMD: '',
+  dailyChestDay: 0,
+  // stats
+  totalMatchesEver: 0,
+  bestCascadeEver: 0,
+  totalGoldEarnedEver: 0,
+  totalSmashEver: 0,
+  totalRaidEver: 0,
+  // bet
+  betIdx: 0,
+  // last match feedback
+  lastMatchGold: 0,
+  // misc
+  welcomed: false,
+  firstSeenAt: Date.now(),
+  lang: 'en',
+});
+
+let state = loadState();
+function loadState() {
+  try {
+    let raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) raw = localStorage.getItem('loot-match-save-v2');
+    if (!raw) raw = localStorage.getItem('loot-match-save-v1');
+    if (!raw) return defaultState();
+    const obj = JSON.parse(raw);
+    return Object.assign(defaultState(), obj);
+  } catch (e) { return defaultState(); }
+}
+function saveState() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+  serverSyncDebounced();
+}
+
+/* =========================================================
+   [22] i18n
+   ========================================================= */
+
+const LANGS = [
+  { code: 'en', name: 'English',    flag: '🇬🇧' },
+  { code: 'ru', name: 'Русский',    flag: '🇷🇺' },
+  { code: 'es', name: 'Español',    flag: '🇪🇸' },
+  { code: 'pt', name: 'Português',  flag: '🇵🇹' },
+  { code: 'de', name: 'Deutsch',    flag: '🇩🇪' },
+  { code: 'fr', name: 'Français',   flag: '🇫🇷' },
+  { code: 'it', name: 'Italiano',   flag: '🇮🇹' },
+  { code: 'tr', name: 'Türkçe',     flag: '🇹🇷' },
+  { code: 'pl', name: 'Polski',     flag: '🇵🇱' },
+  { code: 'nl', name: 'Nederlands', flag: '🇳🇱' },
+  { code: 'uk', name: 'Українська', flag: '🇺🇦' },
+  { code: 'ar', name: 'العربية',     flag: '🇸🇦' },
+  { code: 'hi', name: 'हिन्दी',        flag: '🇮🇳' },
+  { code: 'id', name: 'Indonesia',  flag: '🇮🇩' },
+  { code: 'vi', name: 'Tiếng Việt', flag: '🇻🇳' },
+  { code: 'th', name: 'ไทย',         flag: '🇹🇭' },
+  { code: 'ja', name: '日本語',       flag: '🇯🇵' },
+  { code: 'ko', name: '한국어',       flag: '🇰🇷' },
+  { code: 'zh', name: '中文',         flag: '🇨🇳' },
+  { code: 'fa', name: 'فارسی',       flag: '🇮🇷' },
+];
+
+const I18N = {
+  en: {
+    match_master: 'MATCH MASTER',
+    rotates_in: 'NEW IN',
+    last_match: 'LAST MATCH',
+    bet: 'BET',
+    nav_village: 'Village',
+    nav_play: 'Play',
+    nav_shop: 'Shop',
+    nav_friends: 'Friends',
+    village_sub: 'Build & upgrade — gold from matches comes here.',
+    island_progress: 'Island progress',
+    shop_title: 'Shop',
+    stars_only: 'STARS ONLY · NO ADS',
+    leaderboard: 'Leaderboard',
+    lb_global: 'Global',
+    lb_today: 'Today',
+    not_enough_energy: 'Out of energy. Wait or buy more.',
+    energy_full: 'FULL',
+    cascade_x: 'CASCADE x{n}',
+    mega_cascade: 'MEGA CASCADE!',
+    no_more_moves: 'No moves — reshuffling…',
+    bet_locked: 'Unlocks at island level {n}',
+    daily_chest: 'Daily Chest',
+    daily_streak: 'Streak: {n} days',
+    claim: 'Claim',
+    come_back_tomorrow: 'Come back tomorrow!',
+    settings_title: 'Settings',
+    language: 'Language',
+    welcome_title: 'Welcome to Loot Match!',
+    welcome_match: 'Match 3+ tiles to win gold.',
+    welcome_cascade: 'Cascades multiply your reward — chain for MEGA wins.',
+    welcome_charge: 'Match 🔨 / 🐷 / 🛡️ to charge attacks on the Match Master.',
+    welcome_village: 'Spend gold to build your island. Finish it to unlock new themes.',
+    lets_go: "Let's Go!",
+    tap_to_smash: 'Tap a building to smash it!',
+    tap_to_dig:   'Tap 3 of 4 spots to dig!',
+    smash: 'SMASH!',
+    raid: 'RAID!',
+    shield_armed: 'SHIELD ARMED!',
+    shield_armed_sub: 'Auto-blocks the next attack on your village.',
+    continue: 'Continue',
+    you_got: 'You got',
+    perfect: 'PERFECT RAID!',
+    build: 'BUILD',
+    upgrade: 'UPGRADE',
+    repair: 'REPAIR',
+    maxed: 'MAXED',
+    cost_label: 'Cost',
+    level_label: 'Lvl',
+    collect: 'Collected',
+    no_iap: 'IAP disabled in local dev — set BOT_TOKEN to enable.',
+    island_complete: 'ISLAND COMPLETE!',
+    bonus_coins: '+{n} bonus coins',
+    not_enough_coins: 'Not enough gold!',
+    tap_meter_smash: 'TAP 🔨 TO SMASH!',
+    tap_meter_raid:  'TAP 🐷 TO RAID!',
+    shield_ready: 'SHIELD READY (×{n})',
+    bet_changed: 'Bet: {n}',
+    shield_ok: 'Shield stocked!',
+    raided: 'RAIDED for {n} 💰',
+    smashed: 'SMASHED for {n} 💰',
+    share_title: 'Share',
+    share_body: 'Invite friends — coming soon in v0.5+',
+  },
+  ru: {
+    match_master: 'МАТЧ-МАСТЕР',
+    rotates_in: 'НОВЫЙ',
+    last_match: 'МАТЧ',
+    bet: 'СТАВКА',
+    nav_village: 'Деревня',
+    nav_play: 'Игра',
+    nav_shop: 'Магазин',
+    nav_friends: 'Друзья',
+    village_sub: 'Стройте — золото от матчей идёт сюда.',
+    island_progress: 'Прогресс острова',
+    shop_title: 'Магазин',
+    stars_only: 'ТОЛЬКО STARS · БЕЗ РЕКЛАМЫ',
+    leaderboard: 'Лидеры',
+    lb_global: 'Глобально',
+    lb_today: 'Сегодня',
+    not_enough_energy: 'Энергия закончилась.',
+    energy_full: 'ПОЛНО',
+    cascade_x: 'КАСКАД x{n}',
+    mega_cascade: 'МЕГА-КАСКАД!',
+    no_more_moves: 'Нет ходов — перемешиваю…',
+    bet_locked: 'Откроется на уровне {n}',
+    daily_chest: 'Ежедневный сундук',
+    daily_streak: 'Серия: {n} дней',
+    claim: 'Забрать',
+    come_back_tomorrow: 'Возвращайся завтра!',
+    settings_title: 'Настройки',
+    language: 'Язык',
+    welcome_title: 'Добро пожаловать в Loot Match!',
+    welcome_match: 'Собирай 3+ плитки в ряд — получай золото.',
+    welcome_cascade: 'Каскады умножают награду — делай цепочки!',
+    welcome_charge: 'Собирай 🔨 / 🐷 / 🛡️ — заряжай атаки на Мастера.',
+    welcome_village: 'Трать золото на свой остров. Закончи — открой новые темы.',
+    lets_go: 'Поехали!',
+    tap_to_smash: 'Нажми на здание, чтобы разбить!',
+    tap_to_dig:   'Выбери 3 из 4 спотов!',
+    smash: 'УДАР!',
+    raid: 'НАЛЁТ!',
+    shield_armed: 'ЩИТ АКТИВИРОВАН!',
+    shield_armed_sub: 'Заблокирует следующую атаку.',
+    continue: 'Дальше',
+    you_got: 'Ты получил',
+    perfect: 'ИДЕАЛЬНЫЙ НАЛЁТ!',
+    build: 'СТРОИТЬ',
+    upgrade: 'УЛУЧШИТЬ',
+    repair: 'РЕМОНТ',
+    maxed: 'МАКС',
+    cost_label: 'Цена',
+    level_label: 'Ур',
+    collect: 'Собрано',
+    no_iap: 'Покупки выключены локально.',
+    island_complete: 'ОСТРОВ ЗАВЕРШЁН!',
+    bonus_coins: '+{n} бонусных монет',
+    not_enough_coins: 'Мало золота!',
+    tap_meter_smash: 'НАЖМИ 🔨 ЧТОБЫ РАЗБИТЬ!',
+    tap_meter_raid:  'НАЖМИ 🐷 ЧТОБЫ ОГРАБИТЬ!',
+    shield_ready: 'ЩИТ ГОТОВ (×{n})',
+    bet_changed: 'Ставка: {n}',
+    shield_ok: 'Щит активирован!',
+    raided: 'НАГРАБИЛ {n} 💰',
+    smashed: 'РАЗБИЛ на {n} 💰',
+    share_title: 'Поделиться',
+    share_body: 'Приглашение друзей — скоро в v0.5+',
+  },
+};
+for (const l of LANGS) if (!I18N[l.code]) I18N[l.code] = I18N.en;
+
+function t(key, vars) {
+  const dict = I18N[state.lang] || I18N.en;
+  let s = dict[key] || I18N.en[key] || key;
+  if (vars) for (const k of Object.keys(vars)) s = s.replace('{' + k + '}', vars[k]);
+  return s;
+}
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.getAttribute('data-i18n'));
+  });
+}
+
+/* =========================================================
+   [23] Telegram bridge
+   ========================================================= */
+
+const TG = window.Telegram && window.Telegram.WebApp;
+function tgReady() {
+  if (!TG) return;
+  try {
+    TG.ready();
+    TG.expand();
+    if (TG.requestFullscreen) try { TG.requestFullscreen(); } catch (e) {}
+    if (TG.disableVerticalSwipes) try { TG.disableVerticalSwipes(); } catch (e) {}
+    if (TG.lockOrientation) try { TG.lockOrientation(); } catch (e) {}
+    applySafeArea();
+    if (TG.onEvent) {
+      TG.onEvent('viewportChanged', applySafeArea);
+      TG.onEvent('safeAreaChanged', applySafeArea);
+      TG.onEvent('contentSafeAreaChanged', applySafeArea);
+    }
+    if (state.lang === 'en' && TG.initDataUnsafe && TG.initDataUnsafe.user && TG.initDataUnsafe.user.language_code) {
+      const lc = String(TG.initDataUnsafe.user.language_code).slice(0, 2).toLowerCase();
+      if (I18N[lc]) state.lang = lc;
+    }
+  } catch (e) {}
+}
+function applySafeArea() {
+  if (!TG) return;
+  const csi = TG.contentSafeAreaInset || TG.safeAreaInset || {};
+  const top = Math.max(0, csi.top || 0);
+  const bottom = Math.max(0, csi.bottom || 0);
+  document.documentElement.style.setProperty('--tg-safe-top', top + 'px');
+  document.documentElement.style.setProperty('--tg-safe-bottom', bottom + 'px');
+  resizeBoardCanvas();
+}
+function haptic(kind) {
+  if (!TG || !TG.HapticFeedback) return;
+  try {
+    if (kind === 'tap')        TG.HapticFeedback.impactOccurred('light');
+    else if (kind === 'med')   TG.HapticFeedback.impactOccurred('medium');
+    else if (kind === 'heavy') TG.HapticFeedback.impactOccurred('heavy');
+    else if (kind === 'success') TG.HapticFeedback.notificationOccurred('success');
+    else if (kind === 'err')   TG.HapticFeedback.notificationOccurred('error');
+  } catch (e) {}
+}
+
+/* =========================================================
+   [24] Server sync
+   ========================================================= */
+
+let serverSyncTimer = 0;
+function serverSyncDebounced() {
+  if (!TG || !TG.initData) return;
+  clearTimeout(serverSyncTimer);
+  serverSyncTimer = setTimeout(serverSyncNow, 2500);
+}
+async function serverSyncNow() {
+  if (!TG || !TG.initData) return;
+  try {
+    const SYNC_KEYS = ['coins','gems','energy','energyMax','energyRegenAt',
+      'vaultLifetimeCoins','theme','village','masterDamage','myVillageDamage',
+      'shieldsStocked','boost','meter','armed','freeSpinsLeft',
+      'streak','dailyChestYMD','dailyChestDay',
+      'totalMatchesEver','bestCascadeEver','totalGoldEarnedEver',
+      'totalSmashEver','totalRaidEver','betIdx',
+      'welcomed','firstSeenAt','lang'];
+    const patch = {};
+    for (const k of SYNC_KEYS) patch[k] = state[k];
+    await fetch('/api/state/save', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: TG.initData, patch }),
+    });
+  } catch (e) {}
+}
+let IAP_ENABLED = false;
+let SKUS = [];
+async function fetchServerFlags() {
+  try {
+    const r = await fetch('/api/flags');
+    const d = await r.json();
+    IAP_ENABLED = !!d.iap;
+  } catch (e) {}
+  try {
+    const r = await fetch('/api/skus');
+    const d = await r.json();
+    SKUS = d.skus || [];
+  } catch (e) {}
+}
+async function pollPurchases() {
+  if (!TG || !TG.initData) return;
+  try {
+    const r = await fetch('/api/poll-purchases', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: TG.initData }),
+    });
+    const d = await r.json();
+    if (d.purchases && d.purchases.length) {
+      for (const p of d.purchases) applyGrant(p.grant);
+      saveState();
+      refreshAllUI();
+      toast('Purchase received!');
+    }
+  } catch (e) {}
+}
+function applyGrant(g) {
+  if (!g) return;
+  if (g.coins) { state.coins += g.coins; pulseGoldHud(); }
+  if (g.gems)  state.gems  += g.gems;
+  if (g.energy) state.energy = Math.min(state.energyMax + g.energy, state.energy + g.energy);
+  if (g.energyMax) state.energyMax += g.energyMax;
+  // map server SKU id → booster bucket
+  // (server sends grants like { hammer: 5 } via custom keys; for v0.3 we
+  // also handle the legacy bet/wild/bag keys for back-compat with v0.2 IAP)
+  if (g.hammer)  state.boost.hammer  += g.hammer;
+  if (g.rocket)  state.boost.rocket  += g.rocket;
+  if (g.bomb)    state.boost.bomb    += g.bomb;
+  if (g.shuffle) state.boost.shuffle += g.shuffle;
+  if (g.free)    state.boost.free    += g.free;
+  if (g.betBoosterTokens)  state.boost.free += g.betBoosterTokens;
+  if (g.wildBoosterTokens) state.boost.bomb += g.wildBoosterTokens;
+  if (g.bagBoosterTokens)  state.boost.rocket += g.bagBoosterTokens;
+  if (g.shieldsStocked) state.shieldsStocked += g.shieldsStocked;
+}
+async function buySku(sku) {
+  if (!IAP_ENABLED) { toast(t('no_iap')); return; }
+  if (!TG || !TG.initData) { toast(t('no_iap')); return; }
+  try {
+    const r = await fetch('/api/create-invoice', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: TG.initData, sku }),
+    });
+    const d = await r.json();
+    if (d.link && TG.openInvoice) {
+      TG.openInvoice(d.link, (status) => {
+        if (status === 'paid') {
+          setTimeout(pollPurchases, 1200);
+          setTimeout(pollPurchases, 3500);
+        }
+      });
+    } else toast('Could not open invoice');
+  } catch (e) { toast('Purchase failed'); }
+}
+
+/* =========================================================
+   [25] Energy regen
+   ========================================================= */
+
+function tickEnergy() {
+  if (state.energy >= state.energyMax) { state.energyRegenAt = 0; return; }
+  const now = Date.now();
+  if (!state.energyRegenAt) state.energyRegenAt = now + ENERGY_REGEN_MS;
+  while (state.energyRegenAt && now >= state.energyRegenAt && state.energy < state.energyMax) {
+    state.energy++;
+    state.energyRegenAt += ENERGY_REGEN_MS;
+  }
+  if (state.energy >= state.energyMax) state.energyRegenAt = 0;
+}
+function energyCountdownStr() {
+  if (state.energy >= state.energyMax) return t('energy_full');
+  const ms = (state.energyRegenAt || 0) - Date.now();
+  if (ms <= 0) return '';
+  const m = Math.floor(ms / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  return m + ':' + String(s).padStart(2, '0');
+}
+setInterval(() => {
+  const had = state.energy;
+  tickEnergy();
+  if (had !== state.energy) { saveState(); }
+  refreshEnergyUI();
+  refreshMasterTimer();
+}, 1000);
+
+/* =========================================================
+   [26] Match Master rotation (client-side)
+   ========================================================= */
+
+function getMasterUserSeed() {
+  // Stable per-user seed. If we have a TG userId, use it; otherwise use
+  // a localStorage random GUID.
+  if (TG && TG.initDataUnsafe && TG.initDataUnsafe.user) {
+    return Math.abs(TG.initDataUnsafe.user.id | 0);
+  }
+  let g = localStorage.getItem('lm-uid');
+  if (!g) { g = String(Math.floor(Math.random() * 1e9)); localStorage.setItem('lm-uid', g); }
+  return parseInt(g, 10) || 1;
+}
+function currentMasterWindow() {
+  return Math.floor(Date.now() / MASTER_ROTATION_MS);
+}
+function masterMillisLeft() {
+  return MASTER_ROTATION_MS - (Date.now() % MASTER_ROTATION_MS);
+}
+function getCurrentMaster() {
+  const seed = getMasterUserSeed();
+  const win = currentMasterWindow();
+  // Hash → bot index
+  let h = seed ^ (win * 2654435761);
+  h = (h ^ (h >>> 16)) >>> 0;
+  const idx = h % BOT_MASTERS.length;
+  const bot = BOT_MASTERS[idx];
+  const masterId = 'bot-' + idx + '-w' + win;
+  return { masterId, idx, bot, win };
+}
+function getMasterState() {
+  // Returns { masterId, bot, structures: [{emoji, name, smashed}], pile }
+  const cur = getCurrentMaster();
+  const theme = THEMES.pirate; // v0.3 all masters use pirate theme
+  const damage = state.masterDamage[cur.masterId] || { smashed: [], pile: cur.bot.pileBase };
+  const structures = theme.structures.map((s, i) => ({
+    ...s,
+    smashed: damage.smashed.includes(i),
+    idx: i,
+  }));
+  return { masterId: cur.masterId, bot: cur.bot, structures, pile: damage.pile, win: cur.win };
+}
+function pruneOldMasterDamage() {
+  // Drop entries from past windows so the dict doesn't grow forever.
+  const win = currentMasterWindow();
+  for (const k of Object.keys(state.masterDamage)) {
+    const m = k.match(/-w(\d+)$/);
+    if (m && parseInt(m[1], 10) < win - 1) delete state.masterDamage[k];
+  }
+}
+
+/* =========================================================
+   [27] Match3 engine — 7×7 grid
+   ========================================================= */
+
+let board = [];
+
+function makeEmptyBoard() {
+  const b = new Array(BOARD_ROWS);
+  for (let r = 0; r < BOARD_ROWS; r++) b[r] = new Array(BOARD_COLS).fill(-1);
+  return b;
+}
+function spawnFreshBoard() {
+  board = makeEmptyBoard();
+  for (let r = 0; r < BOARD_ROWS; r++) {
+    for (let c = 0; c < BOARD_COLS; c++) {
+      board[r][c] = pickFreshTile(r, c);
+    }
+  }
+}
+function pickFreshTile(r, c) {
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const tl = Math.floor(Math.random() * NUM_COLORS);
+    if (c >= 2 && board[r][c - 1] === tl && board[r][c - 2] === tl) continue;
+    if (r >= 2 && board[r - 1][c] === tl && board[r - 2][c] === tl) continue;
+    return tl;
+  }
+  return Math.floor(Math.random() * NUM_COLORS);
+}
+function pickReplenishTile() {
+  const r = Math.random();
+  let acc = 0;
+  if (r < (acc += STAR_SPAWN_P)) return TILE.STAR;
+  if (r < (acc += WILD_SPAWN_P)) return TILE.WILD;
+  if (r < (acc += BAG_SPAWN_P))  return TILE.MONEY_BAG;
+  if (r < (acc += CHARGE_SPAWN_P)) return TILE.HAMMER;
+  if (r < (acc += CHARGE_SPAWN_P)) return TILE.PIG;
+  if (r < (acc += CHARGE_SPAWN_P)) return TILE.SHIELD;
+  return Math.floor(Math.random() * NUM_COLORS);
+}
+function tilesMatch(a, b) {
+  if (a === -1 || b === -1) return false;
+  if (a === TILE.WILD || b === TILE.WILD) return true;
+  return a === b;
+}
+function findMatches() {
+  const cells = new Set();
+  let groups = 0;
+  for (let r = 0; r < BOARD_ROWS; r++) {
+    let s = 0;
+    for (let c = 1; c <= BOARD_COLS; c++) {
+      const cont = c < BOARD_COLS && tilesMatch(board[r][s], board[r][c]);
+      if (!cont) {
+        const len = c - s;
+        if (len >= MIN_MATCH) { groups++; for (let k = s; k < c; k++) cells.add(r + ',' + k); }
+        s = c;
+      }
+    }
+  }
+  for (let c = 0; c < BOARD_COLS; c++) {
+    let s = 0;
+    for (let r = 1; r <= BOARD_ROWS; r++) {
+      const cont = r < BOARD_ROWS && tilesMatch(board[s][c], board[r][c]);
+      if (!cont) {
+        const len = r - s;
+        if (len >= MIN_MATCH) { groups++; for (let k = s; k < r; k++) cells.add(k + ',' + c); }
+        s = r;
+      }
+    }
+  }
+  return { cells, groups };
+}
+function trySwap(r1, c1, r2, c2) {
+  if (Math.abs(r1 - r2) + Math.abs(c1 - c2) !== 1) return false;
+  const tmp = board[r1][c1]; board[r1][c1] = board[r2][c2]; board[r2][c2] = tmp;
+  const m = findMatches();
+  if (m.cells.size === 0) {
+    const t2 = board[r1][c1]; board[r1][c1] = board[r2][c2]; board[r2][c2] = t2;
+    return false;
+  }
+  return true;
+}
+function applyGravity() {
+  for (let c = 0; c < BOARD_COLS; c++) {
+    let wr = BOARD_ROWS - 1;
+    for (let r = BOARD_ROWS - 1; r >= 0; r--) {
+      if (board[r][c] !== -1) {
+        if (r !== wr) { board[wr][c] = board[r][c]; board[r][c] = -1; }
+        wr--;
+      }
+    }
+    for (let r = wr; r >= 0; r--) board[r][c] = pickReplenishTile();
+  }
+}
+function hasPossibleMove() {
+  for (let r = 0; r < BOARD_ROWS; r++) {
+    for (let c = 0; c < BOARD_COLS; c++) {
+      const tries = [[r, c, r, c + 1], [r, c, r + 1, c]];
+      for (const [a, b, x, y] of tries) {
+        if (x >= BOARD_ROWS || y >= BOARD_COLS) continue;
+        const tmp = board[a][b]; board[a][b] = board[x][y]; board[x][y] = tmp;
+        const m = findMatches();
+        const t2 = board[a][b]; board[a][b] = board[x][y]; board[x][y] = t2;
+        if (m.cells.size > 0) return true;
+      }
+    }
+  }
+  return false;
+}
+function reshuffle() {
+  const all = [];
+  for (let r = 0; r < BOARD_ROWS; r++) for (let c = 0; c < BOARD_COLS; c++) all.push(board[r][c]);
+  for (let i = all.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = all[i]; all[i] = all[j]; all[j] = tmp;
+  }
+  for (let attempt = 0; attempt < 6; attempt++) {
+    let idx = 0;
+    for (let r = 0; r < BOARD_ROWS; r++) for (let c = 0; c < BOARD_COLS; c++) board[r][c] = all[idx++];
+    if (findMatches().cells.size === 0 && hasPossibleMove()) return;
+    for (let i = all.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = all[i]; all[i] = all[j]; all[j] = tmp;
+    }
+  }
+  spawnFreshBoard();
+}
+
+/* =========================================================
+   [28] Match resolution — gold + meter charge
+   ========================================================= */
+
+const game = {
+  busy: false,
+  selected: null,
+  cascadeDepth: 0,
+};
+
+function effectiveBet() {
+  let idx = state.betIdx;
+  if (idx < 0) idx = 0;
+  if (idx >= BETS.length) idx = BETS.length - 1;
+  return BETS[idx];
+}
+function attemptSwap(r1, c1, r2, c2) {
+  if (game.busy) return;
+  // Hammer booster: destroys a single tile (no swap, no energy)
+  if (state.armed.hammer) {
+    state.armed.hammer = false;
+    setBoosterArmed('hammer', false);
+    if (state.boost.hammer > 0) state.boost.hammer--;
+    board[r1][c1] = -1;
+    renderBoard();
+    refreshAllUI();
+    // After hammer, run cascade resolution to settle
+    setTimeout(async () => {
+      game.busy = true;
+      applyGravity();
+      renderBoard();
+      await wait(180);
+      await resolveAllCascades();
+      game.busy = false;
+      refreshAllUI();
+    }, 200);
+    return;
+  }
+  // Rocket booster: clears the row + column of selected cell
+  if (state.armed.rocket) {
+    state.armed.rocket = false;
+    setBoosterArmed('rocket', false);
+    if (state.boost.rocket > 0) state.boost.rocket--;
+    for (let cc = 0; cc < BOARD_COLS; cc++) board[r1][cc] = -1;
+    for (let rr = 0; rr < BOARD_ROWS; rr++) board[rr][c1] = -1;
+    renderBoard();
+    refreshAllUI();
+    setTimeout(async () => {
+      game.busy = true;
+      // Score as a virtual cascade
+      const matched = new Set();
+      for (let cc = 0; cc < BOARD_COLS; cc++) matched.add(r1 + ',' + cc);
+      for (let rr = 0; rr < BOARD_ROWS; rr++) matched.add(rr + ',' + c1);
+      const fakeMatch = { cells: matched, groups: 1 };
+      // simulate scoring
+      scoreCascadeStep(fakeMatch);
+      applyGravity();
+      renderBoard();
+      await wait(180);
+      await resolveAllCascades();
+      game.busy = false;
+      refreshAllUI();
+    }, 220);
+    return;
+  }
+  // Bomb booster: clears 3x3 around tap
+  if (state.armed.bomb) {
+    state.armed.bomb = false;
+    setBoosterArmed('bomb', false);
+    if (state.boost.bomb > 0) state.boost.bomb--;
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      const rr = r1 + dr, cc = c1 + dc;
+      if (rr >= 0 && rr < BOARD_ROWS && cc >= 0 && cc < BOARD_COLS) board[rr][cc] = -1;
+    }
+    renderBoard();
+    refreshAllUI();
+    setTimeout(async () => {
+      game.busy = true;
+      const matched = new Set();
+      for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+        const rr = r1 + dr, cc = c1 + dc;
+        if (rr >= 0 && rr < BOARD_ROWS && cc >= 0 && cc < BOARD_COLS) matched.add(rr + ',' + cc);
+      }
+      scoreCascadeStep({ cells: matched, groups: 1 });
+      applyGravity();
+      renderBoard();
+      await wait(180);
+      await resolveAllCascades();
+      game.busy = false;
+      refreshAllUI();
+    }, 220);
+    return;
+  }
+
+  // Energy check (unless free-spin active)
+  const bet = effectiveBet();
+  const energyCost = state.freeSpinsLeft > 0 ? 0 : bet.cost;
+  if (state.energy < energyCost) {
+    haptic('err');
+    toast(t('not_enough_energy'));
+    flashEnergyEmpty();
+    return;
+  }
+  const ok = trySwap(r1, c1, r2, c2);
+  if (!ok) {
+    haptic('err');
+    renderBoard(new Set([r1 + ',' + c1, r2 + ',' + c2]));
+    setTimeout(renderBoard, 140);
+    return;
+  }
+  if (state.freeSpinsLeft > 0) state.freeSpinsLeft--;
+  else {
+    state.energy -= energyCost;
+    if (state.energy < state.energyMax && !state.energyRegenAt) {
+      state.energyRegenAt = Date.now() + ENERGY_REGEN_MS;
+    }
+  }
+  renderBoard();
+  refreshEnergyUI();
+  resolveSwapMatches();
+}
+
+function scoreCascadeStep(m) {
+  // Computes gold & meter charge from a match step. Caller is responsible
+  // for animation & clearing.
+  game.cascadeDepth++;
+  state.totalMatchesEver += m.groups;
+  if (game.cascadeDepth > state.bestCascadeEver) state.bestCascadeEver = game.cascadeDepth;
+
+  const mult = CASCADE_MULT[Math.min(game.cascadeDepth, CASCADE_MULT.length - 1)];
+  const bet = effectiveBet();
+  let stepCoins = 0;
+  const flyCoords = [];
+  let chargeAdd = { hammer: 0, pig: 0, shield: 0 };
+  let starCount = 0;
+
+  for (const key of m.cells) {
+    const [r, c] = key.split(',').map(Number);
+    const tile = board[r][c];
+    if (tile === -1) continue;
+    const cellVal = TILE_VALUE[tile] || 1;
+    const earn = cellVal * bet.mult * mult;
+    stepCoins += earn;
+    flyCoords.push({ r, c, earn });
+    if (tile === TILE.HAMMER) chargeAdd.hammer++;
+    else if (tile === TILE.PIG)    chargeAdd.pig++;
+    else if (tile === TILE.SHIELD) chargeAdd.shield++;
+    else if (tile === TILE.STAR)   starCount++;
+  }
+  // Charges scale by cascade × bet — slower at low bets, accelerated by combos
+  const chargeMult = Math.max(1, Math.floor(mult * 0.5 + bet.mult * 0.5));
+  const earnedInt = Math.floor(stepCoins);
+  state.coins += earnedInt;
+  state.totalGoldEarnedEver += earnedInt;
+  state.vaultLifetimeCoins += earnedInt;
+  state.lastMatchGold = earnedInt;
+
+  state.meter.hammer = Math.min(METER_CAP, state.meter.hammer + chargeAdd.hammer * chargeMult);
+  state.meter.pig    = Math.min(METER_CAP, state.meter.pig    + chargeAdd.pig    * chargeMult);
+  state.meter.shield = Math.min(METER_CAP, state.meter.shield + chargeAdd.shield * chargeMult);
+
+  // STAR tiles charge ALL meters by 5
+  if (starCount > 0) {
+    state.meter.hammer = Math.min(METER_CAP, state.meter.hammer + 5 * starCount);
+    state.meter.pig    = Math.min(METER_CAP, state.meter.pig    + 5 * starCount);
+    state.meter.shield = Math.min(METER_CAP, state.meter.shield + 5 * starCount);
+  }
+
+  // VFX
+  if (game.cascadeDepth === 1)      haptic('tap');
+  else if (game.cascadeDepth === 2) haptic('med');
+  else if (game.cascadeDepth === 3) haptic('heavy');
+  else if (game.cascadeDepth >= 4)  { haptic('success'); flashMegaCascade(); }
+  showCascadeLabel(game.cascadeDepth, mult);
+  drawFloatingCoins(flyCoords);
+  pulseGoldStrip();
+  refreshLastMatch();
+  refreshMetersUI();
+  refreshGoldHud();
+}
+
+async function resolveSwapMatches() {
+  game.busy = true;
+  game.cascadeDepth = 0;
+  await resolveAllCascades();
+  game.busy = false;
+  refreshAllUI();
+}
+
+async function resolveAllCascades() {
+  while (true) {
+    const m = findMatches();
+    if (m.cells.size === 0) break;
+    scoreCascadeStep(m);
+    // Clear tiles with highlight
+    for (const key of m.cells) {
+      const [r, c] = key.split(',').map(Number);
+      board[r][c] = -1;
+    }
+    renderBoard(m.cells);
+    await wait(220);
+    applyGravity();
+    renderBoard();
+    await wait(160);
+  }
+  game.cascadeDepth = 0;
+  hideCascadeLabel();
+
+  if (!hasPossibleMove()) {
+    toast(t('no_more_moves'));
+    await wait(450);
+    reshuffle();
+    renderBoard();
+  }
+
+  // Shield auto-stock if shield meter full
+  if (state.meter.shield >= METER_CAP) {
+    state.shieldsStocked = Math.min(3, state.shieldsStocked + 1);
+    state.meter.shield = 0;
+    toast(t('shield_ok'));
+    haptic('success');
+  }
+
+  // Submit leaderboard score (debounced via saveState)
+  if (TG && TG.initData) {
+    fetch('/api/score/submit', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: TG.initData, score: state.vaultLifetimeCoins, mode: 'regular' }),
+    }).catch(() => {});
+  }
+  saveState();
+  refreshAllUI();
+}
+
+function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+/* =========================================================
+   [29] Canvas rendering — bright candy tiles
+   ========================================================= */
+
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+let cellPx = 44;
+
+function resizeBoardCanvas() {
+  const wrap = document.getElementById('canvas-wrap');
+  if (!wrap) return;
+  const rect = wrap.getBoundingClientRect();
+  const avail = Math.min(rect.width - 12, rect.height - 12);
+  const size = Math.max(238, Math.min(420, Math.floor(avail / BOARD_COLS) * BOARD_COLS));
+  canvas.style.width = size + 'px';
+  canvas.style.height = size + 'px';
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = size * dpr;
+  canvas.height = size * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  cellPx = Math.floor(size / BOARD_COLS);
+  renderBoard();
+}
+
+function renderBoard(highlightCells) {
+  if (!ctx) return;
+  const cssSize = parseInt(canvas.style.width || '308', 10);
+  ctx.clearRect(0, 0, cssSize, cssSize);
+  for (let r = 0; r < BOARD_ROWS; r++) {
+    for (let c = 0; c < BOARD_COLS; c++) {
+      const tl = board[r][c];
+      if (tl === -1) continue;
+      const x = c * cellPx;
+      const y = r * cellPx;
+      const isSelected = game.selected && game.selected.r === r && game.selected.c === c;
+      const isHi = highlightCells && highlightCells.has(r + ',' + c);
+      drawTile(tl, x, y, cellPx, isSelected, isHi);
+    }
+  }
+}
+
+function tileEmoji(t) {
+  if (t < NUM_COLORS) return THEMES[state.theme].tiles[t];
+  if (TILE_EMOJI_CHARGE[t]) return TILE_EMOJI_CHARGE[t];
+  return TILE_EMOJI_SPECIAL[t] || '?';
+}
+
+function drawTile(t, x, y, size, selected, highlighted) {
+  // Cream tile background with cartoon outline + drop shadow
+  const pad = 2;
+  const inset = pad + 1;
+  const r = size * 0.20;
+
+  // Drop shadow (offset)
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  roundRect(x + inset, y + inset + 3, size - inset * 2, size - inset * 2, r);
+  ctx.fill();
+
+  // Tile body
+  ctx.fillStyle = '#fff5e1';
+  roundRect(x + inset, y + inset, size - inset * 2, size - inset * 2, r);
+  ctx.fill();
+
+  // Colored ring per slot
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = TILE_RING[t] || '#2a1a04';
+  ctx.stroke();
+
+  // Glossy sheen on top half
+  ctx.save();
+  ctx.beginPath();
+  roundRect(x + inset, y + inset, size - inset * 2, size - inset * 2, r);
+  ctx.clip();
+  const grad = ctx.createLinearGradient(x, y, x, y + size * 0.55);
+  grad.addColorStop(0, 'rgba(255,255,255,0.65)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(x, y, size, size * 0.55);
+  ctx.restore();
+
+  // Match-clear highlight flash
+  if (highlighted) {
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    roundRect(x + inset, y + inset, size - inset * 2, size - inset * 2, r);
+    ctx.fill();
+  }
+
+  // Emoji
+  const emoji = tileEmoji(t);
+  ctx.save();
+  ctx.font = `${Math.floor(size * 0.62)}px -apple-system, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", system-ui`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0,0,0,0.35)';
+  ctx.shadowBlur = 3;
+  ctx.shadowOffsetY = 2;
+  ctx.fillStyle = '#000';
+  ctx.fillText(emoji, x + size / 2, y + size / 2 + size * 0.03);
+  ctx.restore();
+
+  // Selection ring
+  if (selected) {
+    ctx.save();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#ff5c7a';
+    ctx.shadowColor = '#ff5c7a';
+    ctx.shadowBlur = 14;
+    roundRect(x + inset - 1, y + inset - 1, size - inset * 2 + 2, size - inset * 2 + 2, r + 1);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function roundRect(x, y, w, h, r) {
+  if (typeof ctx.roundRect === 'function') {
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, r);
+    return;
+  }
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+window.addEventListener('resize', resizeBoardCanvas);
+
+/* =========================================================
+   [30] Input — tap-tap + swipe
+   ========================================================= */
+
+function getCellFromPointer(ev) {
+  const rect = canvas.getBoundingClientRect();
+  const cssSize = rect.width;
+  const cellCss = cssSize / BOARD_COLS;
+  const x = ev.clientX - rect.left;
+  const y = ev.clientY - rect.top;
+  const c = Math.floor(x / cellCss);
+  const r = Math.floor(y / cellCss);
+  if (r < 0 || r >= BOARD_ROWS || c < 0 || c >= BOARD_COLS) return null;
+  return { r, c };
+}
+let touchStart = null;
+canvas.addEventListener('pointerdown', (ev) => {
+  ev.preventDefault();
+  if (game.busy) return;
+  const cell = getCellFromPointer(ev);
+  if (!cell) return;
+  // If a non-swap booster is armed, the first tap triggers it on this cell.
+  if (state.armed.hammer || state.armed.rocket || state.armed.bomb) {
+    attemptSwap(cell.r, cell.c, cell.r, cell.c); // booster treats both args as the target
+    return;
+  }
+  touchStart = Object.assign({}, cell, { x: ev.clientX, y: ev.clientY });
+  if (game.selected) {
+    if (Math.abs(game.selected.r - cell.r) + Math.abs(game.selected.c - cell.c) === 1) {
+      const from = game.selected;
+      game.selected = null;
+      renderBoard();
+      attemptSwap(from.r, from.c, cell.r, cell.c);
+      return;
+    } else if (game.selected.r === cell.r && game.selected.c === cell.c) {
+      game.selected = null;
+      renderBoard();
+      return;
+    }
+  }
+  game.selected = cell;
+  renderBoard();
+});
+canvas.addEventListener('pointerup', (ev) => {
+  if (!touchStart || game.busy) { touchStart = null; return; }
+  if (state.armed.hammer || state.armed.rocket || state.armed.bomb) { touchStart = null; return; }
+  const dx = ev.clientX - touchStart.x;
+  const dy = ev.clientY - touchStart.y;
+  const adx = Math.abs(dx), ady = Math.abs(dy);
+  const THRESH = 18;
+  if (adx > THRESH || ady > THRESH) {
+    const from = { r: touchStart.r, c: touchStart.c };
+    let to;
+    if (adx > ady) to = { r: from.r, c: from.c + (dx > 0 ? 1 : -1) };
+    else to = { r: from.r + (dy > 0 ? 1 : -1), c: from.c };
+    if (to.r >= 0 && to.r < BOARD_ROWS && to.c >= 0 && to.c < BOARD_COLS) {
+      game.selected = null;
+      renderBoard();
+      attemptSwap(from.r, from.c, to.r, to.c);
+    }
+  }
+  touchStart = null;
+});
+canvas.addEventListener('pointercancel', () => { touchStart = null; });
+
+/* =========================================================
+   [31] VFX
+   ========================================================= */
+
+function drawFloatingCoins(coords) {
+  const rect = canvas.getBoundingClientRect();
+  const cellCss = rect.width / BOARD_COLS;
+  const targetEl = document.getElementById('last-match-num');
+  const targetRect = targetEl.getBoundingClientRect();
+  const tx = targetRect.left + targetRect.width / 2;
+  const ty = targetRect.top + targetRect.height / 2;
+  for (const co of coords) {
+    const el = document.createElement('div');
+    el.className = 'float-coin';
+    el.textContent = '+' + Math.floor(co.earn);
+    const cx = rect.left + (co.c + 0.5) * cellCss;
+    const cy = rect.top + (co.r + 0.5) * cellCss;
+    el.style.left = (cx - 18) + 'px';
+    el.style.top  = (cy - 10) + 'px';
+    document.body.appendChild(el);
+    const dx = tx - cx;
+    const dy = ty - cy;
+    requestAnimationFrame(() => {
+      el.style.transform = 'translate(' + (dx * 0.7) + 'px, ' + (dy * 0.7) + 'px) scale(0.8)';
+      el.style.opacity = '0';
+    });
+    setTimeout(() => el.remove(), 720);
+  }
+}
+function pulseGoldStrip() {
+  const el = document.getElementById('last-match-num');
+  if (!el) return;
+  el.classList.add('pulse');
+  setTimeout(() => el.classList.remove('pulse'), 220);
+}
+function pulseGoldHud() {
+  ['hud-coins', 'v-hud-coins', 's-hud-coins', 'f-hud-coins'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.transition = 'transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1)';
+    el.style.transform = 'scale(1.18)';
+    setTimeout(() => { el.style.transform = ''; }, 220);
+  });
+}
+function showCascadeLabel(depth, mult) {
+  if (depth < 2) return;
+  const sub = document.getElementById('last-match-cascade');
+  const fmt = mult % 1 === 0 ? String(mult) : mult.toFixed(1).replace(/\.0$/, '');
+  sub.textContent = depth >= 4
+    ? t('mega_cascade') + ' x' + fmt
+    : t('cascade_x', { n: 'x' + fmt });
+  sub.className = 'cascade show' + (depth >= 4 ? ' mega' : '');
+}
+function hideCascadeLabel() {
+  const sub = document.getElementById('last-match-cascade');
+  if (!sub) return;
+  sub.className = 'cascade';
+  sub.textContent = '';
+}
+function flashMegaCascade() {
+  const splash = document.getElementById('mega-splash');
+  document.getElementById('mega-text').textContent = t('mega_cascade');
+  splash.classList.add('show');
+  setTimeout(() => splash.classList.remove('show'), 1100);
+}
+function flashEnergyEmpty() {
+  const row = document.getElementById('energy-row');
+  row.classList.add('empty');
+  setTimeout(() => row.classList.remove('empty'), 600);
+}
+
+/* =========================================================
+   [32] UI refresh
+   ========================================================= */
+
+function fmtNum(n) {
+  n = Math.floor(n);
+  if (n >= 1e9) return (n / 1e9).toFixed(1).replace(/\.0$/, '') + 'B';
+  if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (n >= 1e4) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
+  return n.toLocaleString('en-US');
+}
+function refreshAllUI() {
+  refreshGoldHud();
+  refreshEnergyUI();
+  refreshBetBtn();
+  refreshLastMatch();
+  refreshBoosterCounts();
+  refreshMetersUI();
+  refreshMasterBlock();
+  refreshVillage();
+  refreshNavBadge();
+}
+function refreshGoldHud() {
+  const v = fmtNum(state.coins);
+  ['hud-coins', 'v-hud-coins', 's-hud-coins', 'f-hud-coins'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = v;
+  });
+}
+function refreshEnergyUI() {
+  const numEl = document.getElementById('energy-num');
+  const maxEl = document.getElementById('energy-max');
+  if (numEl) numEl.textContent = state.energy;
+  if (maxEl) maxEl.textContent = state.energyMax;
+  const fill = document.getElementById('energy-fill');
+  if (fill) fill.style.width = (state.energy / state.energyMax * 100) + '%';
+  const tm = document.getElementById('energy-timer');
+  if (tm) tm.textContent = energyCountdownStr();
+  const row = document.getElementById('energy-row');
+  if (row) row.classList.toggle('empty', state.energy <= 0);
+}
+function refreshBetBtn() {
+  const bet = effectiveBet();
+  document.getElementById('bet-x').textContent = bet.label;
+}
+function refreshLastMatch() {
+  document.getElementById('last-match-num').textContent = '+' + fmtNum(state.lastMatchGold);
+}
+function refreshBoosterCounts() {
+  const arr = ['hammer', 'rocket', 'bomb', 'shuffle', 'free'];
+  for (const k of arr) {
+    const cnt = document.getElementById('cnt-' + k);
+    const btn = document.getElementById('b-' + k);
+    if (!cnt || !btn) continue;
+    cnt.textContent = state.boost[k] || 0;
+    btn.classList.toggle('empty', (state.boost[k] || 0) <= 0);
+    btn.classList.toggle('armed', !!state.armed[k]);
+  }
+  // Free-spin remaining shows as badge on free-spin button
+  if (state.freeSpinsLeft > 0) {
+    const cnt = document.getElementById('cnt-free');
+    if (cnt) cnt.textContent = state.freeSpinsLeft;
+  }
+}
+function refreshMetersUI() {
+  for (const k of ['hammer', 'pig', 'shield']) {
+    const v = state.meter[k];
+    const fill = document.getElementById('fill-' + k);
+    const num  = document.getElementById('num-' + k);
+    const row  = document.getElementById('meter-' + k);
+    if (fill) fill.style.width = (v / METER_CAP * 100) + '%';
+    if (row)  row.classList.toggle('ready', v >= METER_CAP);
+    if (num) {
+      if (v >= METER_CAP) {
+        if (k === 'hammer') num.textContent = 'TAP!';
+        else if (k === 'pig') num.textContent = 'TAP!';
+        else num.textContent = 'STOCK!';
+      } else {
+        num.textContent = v + '/' + METER_CAP;
+      }
+    }
+  }
+}
+function refreshMasterBlock() {
+  const ms = getMasterState();
+  document.getElementById('m-avatar').textContent = ms.bot.emoji;
+  document.getElementById('m-name').textContent = ms.bot.name;
+  document.getElementById('m-pile').textContent = fmtNum(ms.pile) + ' 💰';
+  // Buildings row
+  const wrap = document.getElementById('m-buildings');
+  wrap.innerHTML = '';
+  for (const s of ms.structures) {
+    const cell = document.createElement('div');
+    cell.className = 'mb-cell' + (s.smashed ? ' damaged' : '');
+    cell.textContent = s.emoji;
+    wrap.appendChild(cell);
+  }
+  refreshMasterTimer();
+}
+function refreshMasterTimer() {
+  const el = document.getElementById('m-timer');
+  if (!el) return;
+  const ms = masterMillisLeft();
+  const min = Math.floor(ms / 60000);
+  const sec = Math.floor((ms % 60000) / 1000);
+  el.textContent = min + ':' + String(sec).padStart(2, '0');
+  if (ms < 1000) {
+    // Rotation just happened — refresh block
+    refreshMasterBlock();
+  }
+}
+function refreshNavBadge() {
+  // Show "!" badge on Village tab if shields or damaged structures present
+  const bd = document.getElementById('nav-bd-village');
+  if (!bd) return;
+  const ready = state.meter.hammer >= METER_CAP || state.meter.pig >= METER_CAP;
+  bd.style.display = ready ? 'block' : 'none';
+}
+
+/* =========================================================
+   [33] Village (your island)
+   ========================================================= */
+
+function getStructureLevel(id) { return state.village[id] || 0; }
+function structureCost(struct, level) {
+  // level = NEXT level (1..5). Cost doubles each step.
+  return struct.base * Math.pow(2, level - 1);
+}
+function totalVillageProgress() {
+  const theme = THEMES[state.theme];
+  let levels = 0, max = 0;
+  for (const s of theme.structures) {
+    levels += getStructureLevel(s.id);
+    max += 5;
+  }
+  return { levels, max };
+}
+function refreshVillage() {
+  const theme = THEMES[state.theme];
+  document.getElementById('village-name').textContent = theme.nameEmoji + ' ' + theme.name;
+  const prog = totalVillageProgress();
+  document.getElementById('vp-fill').style.width = (prog.levels / prog.max * 100) + '%';
+  document.getElementById('vp-text').textContent = prog.levels + ' / ' + prog.max + ' ' + t('level_label').toLowerCase();
+  const list = document.getElementById('struct-list');
+  list.innerHTML = '';
+  for (const s of theme.structures) {
+    const lvl = getStructureLevel(s.id);
+    const card = document.createElement('div');
+    card.className = 'struct-card';
+    const maxed = lvl >= 5;
+    const cost = maxed ? 0 : structureCost(s, lvl + 1);
+    const stars = '★'.repeat(lvl) + '☆'.repeat(5 - lvl);
+    const actionHtml = maxed
+      ? '<div class="maxed">' + t('maxed') + '</div>'
+      : `<button class="btn small gold" data-build="${s.id}">${lvl === 0 ? t('build') : t('upgrade')}</button>
+         <div class="cost">${fmtNum(cost)} 💰</div>`;
+    card.innerHTML = `
+      <div class="struct-icon">${s.emoji}</div>
+      <div class="struct-info">
+        <div class="struct-name">${s.name}</div>
+        <div class="struct-lvl">${t('level_label')} ${lvl} / 5 <span class="stars">${stars}</span></div>
+      </div>
+      <div class="struct-action">${actionHtml}</div>`;
+    list.appendChild(card);
+  }
+  list.querySelectorAll('[data-build]').forEach(btn => {
+    btn.addEventListener('click', () => buildStructure(btn.getAttribute('data-build')));
+  });
+}
+function buildStructure(id) {
+  const theme = THEMES[state.theme];
+  const s = theme.structures.find(x => x.id === id);
+  if (!s) return;
+  const lvl = getStructureLevel(id);
+  if (lvl >= 5) return;
+  const cost = structureCost(s, lvl + 1);
+  if (state.coins < cost) { toast(t('not_enough_coins')); haptic('err'); return; }
+  state.coins -= cost;
+  state.village[id] = lvl + 1;
+  haptic('success');
+  saveState();
+  refreshAllUI();
+  // Check island complete
+  const prog = totalVillageProgress();
+  if (prog.levels >= prog.max) {
+    setTimeout(showIslandCompleteModal, 250);
+  }
+}
+
+function showIslandCompleteModal() {
+  const bonus = 5000;
+  state.coins += bonus;
+  state.totalGoldEarnedEver += bonus;
+  const theme = THEMES[state.theme];
+  const html =
+    '<div class="tier-up">' +
+      '<h2>' + t('island_complete') + '</h2>' +
+      '<div class="big">' + theme.nameEmoji + '</div>' +
+      '<div class="new-name">' + theme.name + '</div>' +
+      '<div class="sub" style="margin-top:6px;">' + t('bonus_coins', { n: fmtNum(bonus) }) + '</div>' +
+      '<div class="actions"><button class="btn gold" id="ic-ok">' + t('lets_go') + '</button></div>' +
+    '</div>';
+  openModal(html);
+  haptic('success');
+  document.getElementById('ic-ok').addEventListener('click', () => {
+    closeModal();
+    refreshAllUI();
+  });
+}
+
+/* =========================================================
+   [34] Smash / Raid mini-events
+   ========================================================= */
+
+const eventOverlay = document.getElementById('event-overlay');
+function openEvent(html) {
+  eventOverlay.classList.add('show');
+}
+function closeEvent() {
+  eventOverlay.classList.remove('show');
+  document.getElementById('ev-final').classList.remove('show');
+  document.getElementById('ev-done').style.display = 'none';
+  document.getElementById('ev-content').innerHTML = '';
+}
+document.getElementById('ev-done').addEventListener('click', closeEvent);
+
+// SMASH — triggered when hammer meter full
+function startSmash() {
+  if (state.meter.hammer < METER_CAP) return;
+  state.meter.hammer = 0;
+  refreshMetersUI();
+  haptic('heavy');
+  const ms = getMasterState();
+  document.getElementById('ev-title').textContent = t('smash');
+  document.getElementById('ev-master').textContent = ms.bot.name + " · " + THEMES[state.theme].nameEmoji + ' ' + THEMES[state.theme].name;
+  document.getElementById('ev-info').innerHTML = '<span>' + t('tap_to_smash') + '</span>';
+  // Show 3 random buildings the player can smash
+  const available = ms.structures.filter(s => !s.smashed);
+  const picks = [];
+  const pool = available.slice();
+  while (picks.length < 3 && pool.length > 0) {
+    const i = Math.floor(Math.random() * pool.length);
+    picks.push(pool.splice(i, 1)[0]);
+  }
+  while (picks.length < 3 && ms.structures.length > 0) {
+    // Pad with smashed buildings as visual filler if not enough
+    picks.push(ms.structures[picks.length % ms.structures.length]);
+  }
+  const content = document.getElementById('ev-content');
+  content.innerHTML = '<div class="smash-buildings">' + picks.map((p, i) =>
+    `<div class="smash-bd" data-smash-idx="${p.idx}" data-smash-slot="${i}" ${p.smashed ? 'data-already="1"' : ''}>${p.emoji}</div>`
+  ).join('') + '</div>';
+  content.querySelectorAll('.smash-bd').forEach(el => {
+    el.addEventListener('click', () => {
+      if (el.classList.contains('smashed') || el.getAttribute('data-already') === '1') return;
+      const idx = parseInt(el.getAttribute('data-smash-idx'), 10);
+      doSmash(ms.masterId, idx, el);
+    });
+  });
+  openEvent();
+}
+function doSmash(masterId, idx, el) {
+  const ms = getMasterState();
+  const bet = effectiveBet();
+  // Smash reward: scales with bet + small random
+  const base = 500 + Math.floor(ms.bot.pileBase * 0.05);
+  const reward = Math.floor(base * (0.8 + Math.random() * 0.5) * bet.mult);
+  // Record damage
+  const dmg = state.masterDamage[masterId] || { smashed: [], pile: ms.pile };
+  if (!dmg.smashed.includes(idx)) dmg.smashed.push(idx);
+  dmg.pile = Math.max(0, dmg.pile - Math.floor(reward * 0.3));
+  state.masterDamage[masterId] = dmg;
+  state.coins += reward;
+  state.totalGoldEarnedEver += reward;
+  state.vaultLifetimeCoins += reward;
+  state.totalSmashEver++;
+  haptic('heavy');
+  el.classList.add('smashed');
+  setTimeout(() => {
+    const final = document.getElementById('ev-final');
+    final.textContent = '+' + fmtNum(reward) + ' 💰';
+    final.classList.add('show');
+    document.getElementById('ev-done').style.display = 'inline-flex';
+    document.getElementById('ev-done').textContent = t('continue');
+    toast(t('smashed', { n: fmtNum(reward) }));
+    saveState();
+    refreshAllUI();
+  }, 500);
+}
+
+// RAID — triggered when pig meter full
+function startRaid() {
+  if (state.meter.pig < METER_CAP) return;
+  state.meter.pig = 0;
+  refreshMetersUI();
+  haptic('heavy');
+  const ms = getMasterState();
+  document.getElementById('ev-title').textContent = t('raid');
+  document.getElementById('ev-master').textContent = ms.bot.name;
+  document.getElementById('ev-info').innerHTML = '<span>' + t('tap_to_dig') + '</span>';
+  // Generate 4 spots: 3 with gold, 1 empty (random position)
+  const bet = effectiveBet();
+  const piePer = Math.floor(ms.pile * (0.06 + Math.random() * 0.06)) * bet.mult;
+  const emptyIdx = Math.floor(Math.random() * 4);
+  const spots = [0, 1, 2, 3].map(i => ({
+    idx: i,
+    empty: i === emptyIdx,
+    reward: i === emptyIdx ? 0 : Math.floor(piePer * (0.7 + Math.random() * 0.6)),
+  }));
+  const content = document.getElementById('ev-content');
+  content.innerHTML = '<div class="raid-spots">' + spots.map(s =>
+    `<div class="raid-spot" data-spot="${s.idx}"></div>`
+  ).join('') + '</div>';
+  let dugCount = 0;
+  let totalGold = 0;
+  let hits = 0;
+  content.querySelectorAll('.raid-spot').forEach((el, i) => {
+    el.addEventListener('click', () => {
+      if (el.classList.contains('dug') || dugCount >= 3) return;
+      const s = spots[i];
+      dugCount++;
+      el.classList.add('dug');
+      if (s.empty) {
+        el.classList.add('empty');
+        el.innerHTML = '<div class="em-icon">🕳️</div><div class="reward">empty</div>';
+      } else {
+        el.innerHTML = '<div class="em-icon">💰</div><div class="reward">+' + fmtNum(s.reward) + '</div>';
+        totalGold += s.reward;
+        hits++;
+      }
+      haptic('med');
+      if (dugCount >= 3) finishRaid(ms.masterId, totalGold, hits === 3);
+    });
+  });
+  openEvent();
+}
+function finishRaid(masterId, totalGold, perfect) {
+  state.coins += totalGold;
+  state.totalGoldEarnedEver += totalGold;
+  state.vaultLifetimeCoins += totalGold;
+  state.totalRaidEver++;
+  const dmg = state.masterDamage[masterId] || { smashed: [], pile: getCurrentMaster().bot.pileBase };
+  dmg.pile = Math.max(0, dmg.pile - totalGold);
+  state.masterDamage[masterId] = dmg;
+  haptic('success');
+  setTimeout(() => {
+    const final = document.getElementById('ev-final');
+    let txt = '+' + fmtNum(totalGold) + ' 💰';
+    if (perfect) txt = '🌟 ' + t('perfect') + '  ' + txt;
+    final.textContent = txt;
+    final.classList.add('show');
+    document.getElementById('ev-done').style.display = 'inline-flex';
+    document.getElementById('ev-done').textContent = t('continue');
+    toast(t('raided', { n: fmtNum(totalGold) }));
+    saveState();
+    refreshAllUI();
+  }, 600);
+}
+
+// Meter clicks
+document.getElementById('meter-hammer').addEventListener('click', () => {
+  if (state.meter.hammer >= METER_CAP) startSmash();
+});
+document.getElementById('meter-pig').addEventListener('click', () => {
+  if (state.meter.pig >= METER_CAP) startRaid();
+});
+document.getElementById('meter-shield').addEventListener('click', () => {
+  if (state.shieldsStocked > 0) {
+    toast(t('shield_ready', { n: state.shieldsStocked }));
+  }
+});
+
+/* =========================================================
+   [35] Boosters
+   ========================================================= */
+
+function setBoosterArmed(kind, on) {
+  const el = document.getElementById('b-' + kind);
+  if (el) el.classList.toggle('armed', !!on);
+}
+function armBooster(kind) {
+  if ((state.boost[kind] || 0) <= 0) { toast('No ' + kind + ' tokens — buy in shop'); haptic('err'); return; }
+  // Toggle off if already armed
+  if (state.armed[kind]) {
+    state.armed[kind] = false;
+    setBoosterArmed(kind, false);
+    return;
+  }
+  // Disarm any others
+  for (const k of ['hammer', 'rocket', 'bomb']) state.armed[k] = false;
+  state.armed[kind] = true;
+  for (const k of ['hammer', 'rocket', 'bomb']) setBoosterArmed(k, state.armed[k]);
+  toast(kind.toUpperCase() + ' armed — tap a tile');
+}
+document.getElementById('b-hammer').addEventListener('click', () => armBooster('hammer'));
+document.getElementById('b-rocket').addEventListener('click', () => armBooster('rocket'));
+document.getElementById('b-bomb').addEventListener('click',   () => armBooster('bomb'));
+document.getElementById('b-shuffle').addEventListener('click', () => {
+  if ((state.boost.shuffle || 0) <= 0) { toast('No shuffle tokens'); haptic('err'); return; }
+  state.boost.shuffle--;
+  reshuffle();
+  renderBoard();
+  haptic('med');
+  saveState();
+  refreshAllUI();
+});
+document.getElementById('b-free').addEventListener('click', () => {
+  if ((state.boost.free || 0) <= 0) { toast('No free-spin tokens'); haptic('err'); return; }
+  state.boost.free--;
+  state.freeSpinsLeft += 5;
+  haptic('success');
+  toast('Free 5 matches!');
+  saveState();
+  refreshAllUI();
+});
+
+/* =========================================================
+   [36] Bet button + tab switching + modals
+   ========================================================= */
+
+document.getElementById('bet-btn').addEventListener('click', () => {
+  state.betIdx = (state.betIdx + 1) % BETS.length;
+  haptic('tap');
+  saveState();
+  refreshBetBtn();
+  toast(t('bet_changed', { n: BETS[state.betIdx].label }));
+});
+
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.getAttribute('data-tab');
+    showTab(tab);
+  });
+});
+function showTab(tab) {
+  document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+  const target = document.getElementById('screen-' + tab);
+  if (target) target.classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-tab') === tab));
+  if (tab === 'play')    { resizeBoardCanvas(); refreshAllUI(); }
+  if (tab === 'village') { refreshVillage(); refreshAllUI(); }
+  if (tab === 'shop')    { renderShop(); refreshAllUI(); }
+  if (tab === 'friends') { loadLeaderboard(); refreshAllUI(); }
+}
+
+const modalBack = document.getElementById('modal-back');
+const modalEl = document.getElementById('modal');
+function openModal(html) {
+  modalEl.innerHTML = '<div class="modal-close" id="modal-close">×</div>' + html;
+  modalBack.classList.add('show');
+  const close = document.getElementById('modal-close');
+  if (close) close.addEventListener('click', closeModal);
+}
+function closeModal() { modalBack.classList.remove('show'); }
+modalBack.addEventListener('click', (ev) => { if (ev.target === modalBack) closeModal(); });
+
+/* =========================================================
+   [37] Daily chest / welcome / settings / shop / leaderboard
+   ========================================================= */
+
+function todayYMD() {
+  const d = new Date();
+  return d.getUTCFullYear() + '-' + String(d.getUTCMonth()+1).padStart(2,'0') + '-' + String(d.getUTCDate()).padStart(2,'0');
+}
+function yesterdayYMD() {
+  const d = new Date(); d.setUTCDate(d.getUTCDate() - 1);
+  return d.getUTCFullYear() + '-' + String(d.getUTCMonth()+1).padStart(2,'0') + '-' + String(d.getUTCDate()).padStart(2,'0');
+}
+function canClaimDaily() { return state.dailyChestYMD !== todayYMD(); }
+function nextChestDay() {
+  if (state.dailyChestDay >= 7) return 1;
+  if (state.dailyChestYMD && state.dailyChestYMD !== yesterdayYMD()) return 1;
+  return state.dailyChestDay + 1;
+}
+function showDailyModal() {
+  const next = nextChestDay();
+  const claimable = canClaimDaily();
+  let cells = '';
+  for (let i = 0; i < 7; i++) {
+    const day = i + 1;
+    const item = DAILY_CHEST[i];
+    const isToday = (claimable && day === next) || (!claimable && day === state.dailyChestDay);
+    const claimedByPrior = !claimable && day < state.dailyChestDay;
+    const futureDay = claimable ? (day > next) : (day > state.dailyChestDay);
+    cells +=
+      '<div class="chest-day' +
+        (isToday ? ' today' : '') +
+        (claimedByPrior ? ' claimed' : '') +
+        (futureDay ? ' future' : '') + '">' +
+        '<div class="d">' + day + '</div>' +
+        '<div class="em">' + item.em + '</div>' +
+        '<div class="amt">+' + fmtNum(item.coins) + (item.energy ? ' ⚡' + item.energy : '') + '</div>' +
+      '</div>';
+  }
+  const html =
+    '<h2>' + t('daily_chest') + '</h2>' +
+    '<div class="sub">' + t('daily_streak', { n: state.streak }) + '</div>' +
+    '<div class="chest-grid">' + cells + '</div>' +
+    '<div class="actions">' +
+      (claimable
+        ? '<button class="btn gold" id="claim-daily">' + t('claim') + ' · Day ' + next + '</button>'
+        : '<div class="center opacity-60">' + t('come_back_tomorrow') + '</div>') +
+    '</div>';
+  openModal(html);
+  if (claimable) {
+    document.getElementById('claim-daily').addEventListener('click', () => {
+      claimDaily();
+      closeModal();
+    });
+  }
+}
+function claimDaily() {
+  if (!canClaimDaily()) return;
+  const next = nextChestDay();
+  const item = DAILY_CHEST[next - 1];
+  if (state.dailyChestYMD === yesterdayYMD()) state.streak = (state.streak || 0) + 1;
+  else state.streak = 1;
+  state.coins += item.coins;
+  state.totalGoldEarnedEver += item.coins;
+  state.vaultLifetimeCoins += item.coins;
+  if (item.energy) state.energy = Math.min(state.energyMax + item.energy, state.energy + item.energy);
+  state.dailyChestYMD = todayYMD();
+  state.dailyChestDay = next;
+  haptic('success');
+  pulseGoldHud();
+  saveState();
+  refreshAllUI();
+  toast('+' + fmtNum(item.coins) + ' 💰' + (item.energy ? ' +' + item.energy + ' ⚡' : ''));
+}
+
+function showWelcomeModal() {
+  const html =
+    '<h2>' + t('welcome_title') + '</h2>' +
+    '<div class="welcome-grid">' +
+      '<div class="em">💰</div><div><span class="lbl">Match</span><br>' + t('welcome_match') + '</div>' +
+      '<div class="em">⚡</div><div><span class="lbl">Cascade</span><br>' + t('welcome_cascade') + '</div>' +
+      '<div class="em">🔨</div><div><span class="lbl">Steal</span><br>' + t('welcome_charge') + '</div>' +
+      '<div class="em">🏠</div><div><span class="lbl">Village</span><br>' + t('welcome_village') + '</div>' +
+    '</div>' +
+    '<div class="actions"><button class="btn gold full" id="wel-ok">' + t('lets_go') + '</button></div>';
+  openModal(html);
+  document.getElementById('wel-ok').addEventListener('click', () => {
+    state.welcomed = true;
+    saveState();
+    closeModal();
+  });
+}
+
+function showSettingsModal() {
+  const cur = LANGS.find(l => l.code === state.lang);
+  const html =
+    '<h2>' + t('settings_title') + '</h2>' +
+    '<div class="lang-grid" id="lang-grid"></div>' +
+    '<div style="text-align:center;font-size:11px;color:var(--ink-soft);margin-top:8px;">' + VERSION + '</div>';
+  openModal(html);
+  const grid = document.getElementById('lang-grid');
+  for (const l of LANGS) {
+    const cell = document.createElement('div');
+    cell.className = 'lang-cell' + (l.code === state.lang ? ' active' : '');
+    cell.innerHTML = '<span class="flag">' + l.flag + '</span>' + l.name;
+    cell.addEventListener('click', () => {
+      state.lang = l.code;
+      saveState();
+      applyI18n();
+      refreshAllUI();
+      closeModal();
+      setTimeout(showSettingsModal, 80);
+    });
+    grid.appendChild(cell);
+  }
+}
+
+function renderShop() {
+  const items = (SKUS && SKUS.length) ? SKUS.map(s => ({
+    id: s.id, ico: shopIcon(s.id), title: s.title, desc: s.description, price: s.price,
+    featured: s.id === 'starter_pack',
+  })) : STAR_SHOP_FALLBACK;
+  const list = document.getElementById('shop-list');
+  list.innerHTML = '';
+  for (const it of items) {
+    const card = document.createElement('div');
+    card.className = 'shop-item' + (it.featured ? ' featured' : '');
+    card.innerHTML = `
+      <div class="ico">${it.ico}</div>
+      <div class="info">
+        <div class="ti">${it.title}</div>
+        <div class="desc">${it.desc}</div>
+      </div>
+      <div class="price">${it.price} ⭐</div>`;
+    card.addEventListener('click', () => buySku(it.id));
+    list.appendChild(card);
+  }
+  if (!IAP_ENABLED) {
+    const note = document.createElement('div');
+    note.style.cssText = 'font-size:11px;color:var(--ink-soft);text-align:center;margin:8px 0;padding:8px;background:rgba(0,0,0,0.05);border-radius:10px;';
+    note.textContent = t('no_iap');
+    list.appendChild(note);
+  }
+}
+function shopIcon(id) {
+  const m = {
+    starter_pack: '🎁', coins_small: '💰', coins_medium: '💰', coins_large: '💰', coins_mega: '💰',
+    energy_refill: '⚡', energy_full: '⚡', hammer_pack: '🔨', rocket_pack: '🚀',
+    bomb_pack: '💣', shuffle_pack: '🔄', free_pack: '⚡⚡',
+    bet_booster: '⚡', wild_booster: '🎰', bag_booster: '💰',
+    skin_pirate: '🏴‍☠️', skin_dragon: '🐉', skin_royal: '👑',
+    battle_pass: '⭐', shield_24h: '🛡️', test_purchase: '🧪',
+  };
+  return m[id] || '💎';
+}
+
+let lbMode = 'regular';
+async function loadLeaderboard() {
+  try {
+    const r = await fetch('/api/leaderboard?mode=' + lbMode);
+    const d = await r.json();
+    renderLeaderboard(d.top || []);
+  } catch (e) {
+    document.getElementById('lb-list').textContent = '—';
+  }
+}
+function renderLeaderboard(top) {
+  const list = document.getElementById('lb-list');
+  if (!list) return;
+  if (!top.length) { list.textContent = 'Be the first on the board!'; return; }
+  const myId = (TG && TG.initDataUnsafe && TG.initDataUnsafe.user && TG.initDataUnsafe.user.id) || null;
+  list.innerHTML = top.slice(0, 50).map((e, i) =>
+    '<div class="lb-row' + (myId && e.uid === myId ? ' me' : '') + '">' +
+      '<div class="rank">' + (i + 1) + '</div>' +
+      '<div class="name">' + escapeHtml(e.name) + (myId && e.uid === myId ? ' (you)' : '') + '</div>' +
+      '<div class="score">' + fmtNum(e.score) + ' 💰</div>' +
+    '</div>'
+  ).join('');
+}
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+document.querySelectorAll('.lb-tab').forEach(el => {
+  el.addEventListener('click', () => {
+    lbMode = el.getAttribute('data-m');
+    document.querySelectorAll('.lb-tab').forEach(x => x.classList.toggle('active', x === el));
+    loadLeaderboard();
+  });
+});
+
+document.getElementById('btn-daily').addEventListener('click', showDailyModal);
+document.getElementById('btn-settings').addEventListener('click', showSettingsModal);
+document.getElementById('btn-share').addEventListener('click', () => {
+  toast(t('share_body'));
+});
+document.getElementById('v-collect').addEventListener('click', () => {
+  // Placeholder collect: in v0.5 will pay out passive gold from structures
+  const earned = Math.floor((Date.now() - (state.firstSeenAt || Date.now())) / 60000 * 5);
+  toast(t('collect') + ': v0.5 feature');
+});
+
+/* =========================================================
+   [38] Toast
+   ========================================================= */
+
+let toastTimer = 0;
+function toast(msg) {
+  const el = document.getElementById('toast-el');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.opacity = '1';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.style.opacity = '0'; }, 1900);
+}
+
+/* =========================================================
+   [39] Boot
+   ========================================================= */
+
+(async function boot() {
+  tgReady();
+  applyI18n();
+  pruneOldMasterDamage();
+  spawnFreshBoard();
+  resizeBoardCanvas();
+  refreshAllUI();
+  refreshMasterBlock();
+
+  if (!state.welcomed) {
+    setTimeout(showWelcomeModal, 350);
+  } else if (canClaimDaily()) {
+    setTimeout(showDailyModal, 500);
+  }
+
+  await fetchServerFlags();
+  // Load remote state for cross-device sync
+  if (TG && TG.initData) {
+    try {
+      const r = await fetch('/api/state/load', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData: TG.initData }),
+      });
+      const d = await r.json();
+      if (d.exists && d.state) {
+        Object.assign(state, d.state);
+        saveState();
+        refreshAllUI();
+      }
+    } catch (e) {}
+  }
+  setInterval(pollPurchases, 5000);
+  if (TG && TG.initData) {
+    fetch('/api/heartbeat', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: TG.initData, lang: state.lang, streak: state.streak }),
+    }).catch(() => {});
+  }
+})();
+
+</script>
+</body>
+</html>

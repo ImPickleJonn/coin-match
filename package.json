@@ -1,0 +1,16 @@
+{
+  "name": "coin-match",
+  "version": "0.7.0",
+  "description": "Coin Match — Match3 × Coin Master hybrid Telegram Mini App. Match tiles, charge attacks, raid the Match Master, build your island. Stars IAP only, no ads.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.0"
+  }
+}

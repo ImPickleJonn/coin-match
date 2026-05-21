@@ -1,0 +1,2017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+<meta name="theme-color" content="#0e0820" />
+<title>Loot Match · Match · Cascade · Loot</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  /* =========================================================
+     [01] Root, palette (Match Icon house style), body bg
+     ========================================================= */
+  :root {
+    --bg-top:        #1a1230;
+    --bg-bottom:     #0e0820;
+    --gold:          #ffd864;
+    --gold-deep:     #ffb84d;
+    --gold-glow:     #ffeaa8;
+    --gold-shadow:   #6f4d05;
+    --silver:        #d4d8e3;
+    --p-blue:        #4f8cff;
+    --p-blue-deep:   #2a4faf;
+    --accent-pink:   #ff3b7a;
+    --accent-purple: #a263e8;
+    --text:          #e6e9ef;
+    --text-2:        #c7cdd9;
+    --text-muted:    #8a8ca0;
+    --pill:          rgba(255, 255, 255, 0.08);
+    --pill-strong:   rgba(255, 255, 255, 0.16);
+    --tg-safe-top:   0px;
+    --tg-safe-bottom: 0px;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    height: 100%; width: 100%;
+    overflow: hidden; overscroll-behavior: none;
+    user-select: none; -webkit-user-select: none;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+    color: var(--text);
+    background:
+      radial-gradient(ellipse 60% 35% at 20% 18%, rgba(255, 216, 100, 0.10) 0%, transparent 65%),
+      radial-gradient(ellipse 60% 35% at 80% 18%, rgba(91, 224, 255, 0.10) 0%, transparent 65%),
+      radial-gradient(ellipse 80% 40% at 50% 32%, rgba(176, 76, 240, 0.12) 0%, transparent 70%),
+      linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+    -webkit-touch-callout: none;
+  }
+  body { position: fixed; inset: 0; }
+
+  #app {
+    position: absolute; inset: 0;
+    padding-top: var(--tg-safe-top);
+    padding-bottom: var(--tg-safe-bottom);
+    display: flex; flex-direction: column;
+    align-items: center;
+  }
+
+  /* =========================================================
+     [02] Topbar — small pills + gear icons
+     ========================================================= */
+  .topbar {
+    width: 100%; max-width: 480px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 12px 0 12px;
+    z-index: 30;
+    flex-shrink: 0;
+  }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--pill); color: #fff;
+    border-radius: 999px; padding: 6px 12px;
+    font-weight: 800; font-size: 14px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.12);
+  }
+  .pill.gold {
+    background: linear-gradient(180deg, rgba(255,216,100,0.28), rgba(184,131,23,0.22));
+    border-color: rgba(255,216,100,0.5);
+    color: #fff8d8;
+  }
+  .pill .em { font-size: 15px; line-height: 1; }
+  .pill .num { font-variant-numeric: tabular-nums; }
+  .topbar .left, .topbar .right { display: flex; gap: 6px; align-items: center; }
+  .gear {
+    width: 34px; height: 34px;
+    background: var(--pill); color: #fff;
+    border-radius: 50%; border: 1px solid rgba(255,255,255,0.14);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 16px; cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  }
+  .gear:active { transform: scale(0.94); }
+
+  /* =========================================================
+     [03] Prize box — BIG gold counter above grid (the centerpiece)
+     ========================================================= */
+  .prize-box {
+    width: calc(100% - 24px);
+    max-width: 460px;
+    margin: 12px 12px 8px 12px;
+    padding: 14px 18px 10px 18px;
+    background:
+      radial-gradient(ellipse at top, rgba(255,216,100,0.18) 0%, transparent 70%),
+      linear-gradient(180deg, rgba(20,12,38,0.92), rgba(14,8,32,0.95));
+    border: 2px solid var(--gold);
+    border-radius: 22px;
+    text-align: center;
+    box-shadow:
+      0 0 0 4px rgba(255,216,100,0.10),
+      0 12px 28px rgba(0,0,0,0.55),
+      inset 0 0 24px rgba(255,216,100,0.08);
+    position: relative;
+    flex-shrink: 0;
+  }
+  .prize-label {
+    font-size: 10px;
+    letter-spacing: 4px;
+    font-weight: 800;
+    color: var(--gold);
+    text-transform: uppercase;
+    opacity: 0.85;
+    line-height: 1;
+  }
+  .prize-num {
+    font-size: 48px;
+    font-weight: 900;
+    background: linear-gradient(180deg, #fff 0%, var(--gold-glow) 35%, var(--gold) 65%, var(--gold-shadow) 100%);
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+    line-height: 1.05;
+    margin: 4px 0 2px 0;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -1px;
+    filter: drop-shadow(0 2px 8px rgba(255,216,100,0.45));
+    transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .prize-num.pulse { transform: scale(1.08); }
+  .prize-sub {
+    height: 14px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    opacity: 0;
+    transition: opacity 180ms;
+    line-height: 1;
+  }
+  .prize-sub.show { opacity: 1; }
+  .prize-sub.cascade {
+    background: linear-gradient(90deg, var(--gold), var(--accent-pink), var(--accent-purple), var(--gold));
+    background-size: 250% 100%;
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+    animation: cascadeShift 1.5s linear infinite;
+  }
+  @keyframes cascadeShift {
+    from { background-position: 0% 0; }
+    to   { background-position: 100% 0; }
+  }
+  .prize-sub.tier { color: var(--text-2); }
+
+  /* =========================================================
+     [04] Grid canvas wrap — fills middle, centered
+     ========================================================= */
+  #canvas-wrap {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: 460px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 4px 8px;
+    min-height: 0;
+  }
+  #board {
+    display: block;
+    background: transparent;
+    touch-action: none;
+  }
+
+  /* Floating "+N coins" text rising from the board */
+  .float-coin {
+    position: absolute;
+    pointer-events: none;
+    font-weight: 900;
+    color: var(--gold);
+    text-shadow:
+      0 2px 6px rgba(0,0,0,0.7),
+      0 0 10px rgba(255,216,100,0.55);
+    font-size: 17px;
+    z-index: 40;
+    font-variant-numeric: tabular-nums;
+    transition: transform 700ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 700ms;
+  }
+
+  /* Mega cascade splash */
+  .mega-splash {
+    position: absolute; inset: 0;
+    z-index: 50;
+    display: none;
+    align-items: center; justify-content: center;
+    pointer-events: none;
+  }
+  .mega-splash.show { display: flex; }
+  .mega-splash .txt {
+    font-size: 54px; font-weight: 900;
+    background: linear-gradient(90deg, var(--gold), var(--accent-pink), var(--accent-purple), var(--p-blue), var(--gold));
+    background-size: 200% 100%;
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+    animation: megaPulse 600ms ease-out, cascadeShift 1.5s linear infinite 600ms;
+    filter: drop-shadow(0 8px 20px rgba(255,216,100,0.6));
+    text-align: center;
+    letter-spacing: 2px;
+    line-height: 1.0;
+  }
+  @keyframes megaPulse {
+    0%   { opacity: 0; transform: scale(0.5); }
+    50%  { opacity: 1; transform: scale(1.15); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+
+  /* =========================================================
+     [05] Energy row — below the grid
+     ========================================================= */
+  .energy-row {
+    width: calc(100% - 24px);
+    max-width: 460px;
+    margin: 4px 12px 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.08);
+    font-size: 13px;
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+  .energy-icon { font-size: 18px; line-height: 1; }
+  .energy-bar {
+    flex: 1;
+    height: 9px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 999px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.08);
+    position: relative;
+  }
+  .energy-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--p-blue-deep), var(--p-blue), var(--gold));
+    transition: width 300ms ease;
+    box-shadow: 0 0 8px rgba(255,216,100,0.4);
+  }
+  .energy-num {
+    color: var(--gold);
+    font-variant-numeric: tabular-nums;
+    min-width: 46px;
+    text-align: right;
+    font-size: 13px;
+  }
+  .energy-timer {
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 700;
+    min-width: 32px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .energy-row.empty .energy-num { color: var(--accent-pink); }
+
+  /* =========================================================
+     [06] Bet selector row — below energy
+     ========================================================= */
+  .bet-row {
+    width: calc(100% - 24px);
+    max-width: 460px;
+    margin: 6px 12px 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .bet-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--text-muted);
+    font-weight: 800;
+    min-width: 30px;
+  }
+  .bet-pills {
+    display: flex;
+    gap: 4px;
+    flex: 1;
+  }
+  .bet-pill {
+    flex: 1;
+    padding: 8px 0;
+    border-radius: 11px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    font-size: 12px;
+    font-weight: 900;
+    text-align: center;
+    cursor: pointer;
+    color: var(--text-2);
+    position: relative;
+  }
+  .bet-pill.active {
+    background: linear-gradient(180deg, rgba(255,216,100,0.32), rgba(184,131,23,0.22));
+    border-color: var(--gold);
+    color: #fff8d8;
+    box-shadow: 0 0 0 2px rgba(255,216,100,0.2), 0 4px 10px rgba(255,184,77,0.25);
+  }
+  .bet-pill.locked { opacity: 0.38; color: var(--text-muted); }
+  .bet-pill .lock { position: absolute; top: 2px; right: 4px; font-size: 8px; opacity: 0.6; }
+
+  /* =========================================================
+     [07] Booster row — bottom action bar
+     ========================================================= */
+  .booster-row {
+    width: calc(100% - 24px);
+    max-width: 460px;
+    margin: 10px 12px 12px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .booster {
+    width: 56px; height: 56px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04));
+    border: 1.5px solid rgba(255,255,255,0.16);
+    border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px;
+    cursor: pointer;
+    position: relative;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.35), 0 6px 12px rgba(0,0,0,0.35);
+    transition: transform 80ms;
+  }
+  .booster:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,0.35); }
+  .booster.armed {
+    background: linear-gradient(180deg, rgba(255,216,100,0.45), rgba(184,131,23,0.30));
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(255,216,100,0.30), 0 4px 0 rgba(0,0,0,0.35),
+                0 0 18px rgba(255,216,100,0.45);
+    animation: armedPulse 1.1s ease-in-out infinite;
+  }
+  @keyframes armedPulse {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-3px); }
+  }
+  .booster .cnt {
+    position: absolute; top: -5px; right: -5px;
+    background: var(--gold);
+    color: #2a1a04;
+    font-size: 10px; font-weight: 900;
+    padding: 2px 6px; border-radius: 999px;
+    min-width: 18px; text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,255,255,0.4);
+  }
+  .booster.empty { opacity: 0.55; }
+  .booster.empty .cnt { background: rgba(255,255,255,0.2); color: #fff; }
+
+  /* =========================================================
+     [08] Modal — generic overlay
+     ========================================================= */
+  .modal-back {
+    position: absolute; inset: 0;
+    background: rgba(8, 4, 18, 0.75);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+    display: none;
+    align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .modal-back.show { display: flex; }
+  .modal {
+    position: relative;
+    background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 22px;
+    padding: 24px 20px 20px 20px;
+    max-width: 360px; width: 100%;
+    max-height: 86vh; overflow-y: auto;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.6);
+  }
+  .modal h2 {
+    margin: 0 0 8px 0;
+    font-size: 22px; font-weight: 900;
+    color: var(--gold);
+    text-align: center;
+    letter-spacing: 0.5px;
+  }
+  .modal .sub {
+    text-align: center;
+    font-size: 13px; color: var(--text-2);
+    margin-bottom: 14px;
+  }
+  .modal .row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .modal .row:last-child { border-bottom: none; }
+  .modal .actions {
+    display: flex; flex-direction: column; gap: 10px;
+    margin-top: 14px;
+  }
+  .modal-close {
+    position: absolute; top: 8px; right: 8px;
+    width: 30px; height: 30px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 17px; cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.12);
+    z-index: 2;
+  }
+
+  /* Btn (used in modals) */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    gap: 8px;
+    background: linear-gradient(180deg, var(--gold-glow) 0%, var(--gold) 50%, var(--gold-deep) 100%);
+    color: #2a1a04;
+    border: 2px solid var(--gold-glow);
+    border-radius: 14px;
+    padding: 12px 22px;
+    font-size: 16px; font-weight: 900;
+    letter-spacing: 0.5px;
+    box-shadow: 0 5px 0 var(--gold-shadow), 0 8px 16px rgba(0,0,0,0.35);
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+  .btn:active { transform: translateY(2px); box-shadow: 0 3px 0 var(--gold-shadow), 0 5px 10px rgba(0,0,0,0.3); }
+  .btn.ghost {
+    background: rgba(255,255,255,0.06);
+    color: var(--text);
+    border: 1px solid rgba(255,255,255,0.18);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    text-transform: none;
+  }
+  .btn.full { width: 100%; }
+  .btn.small { padding: 8px 14px; font-size: 13px; border-radius: 10px; }
+
+  /* Tier-up celebration */
+  .tier-up { text-align: center; }
+  .tier-up .big {
+    font-size: 84px;
+    margin: 8px 0;
+    filter: drop-shadow(0 8px 20px rgba(255,216,100,0.5));
+  }
+  .tier-up .new-name {
+    font-size: 26px; font-weight: 900;
+    color: var(--gold);
+    margin-bottom: 4px;
+  }
+
+  /* Daily chest */
+  .chest-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 5px;
+    margin: 10px 0 12px 0;
+  }
+  .chest-day {
+    aspect-ratio: 1;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 10px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    font-size: 9px;
+    position: relative;
+  }
+  .chest-day .em { font-size: 20px; }
+  .chest-day .amt { font-size: 9px; color: var(--gold); font-weight: 800; }
+  .chest-day .d { position: absolute; top: 2px; left: 4px; opacity: 0.45; font-size: 8px; font-weight: 700; }
+  .chest-day.claimed { opacity: 0.32; }
+  .chest-day.today {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 2px rgba(255,216,100,0.25);
+    background: linear-gradient(180deg, rgba(255,216,100,0.2), rgba(255,216,100,0.05));
+  }
+  .chest-day.future { opacity: 0.45; }
+
+  /* Shop */
+  .shop-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 14px;
+    margin-bottom: 7px;
+    cursor: pointer;
+  }
+  .shop-item:active { transform: scale(0.98); }
+  .shop-item.featured {
+    border-color: var(--gold);
+    background: linear-gradient(180deg, rgba(255,216,100,0.15), rgba(255,216,100,0.04));
+    box-shadow: 0 4px 12px rgba(255,216,100,0.13);
+  }
+  .shop-item .ico { font-size: 28px; min-width: 38px; text-align: center; }
+  .shop-item .info { flex: 1; min-width: 0; }
+  .shop-item .ti { font-size: 14px; font-weight: 800; }
+  .shop-item .desc { font-size: 11px; color: var(--text-muted); margin-top: 2px; line-height: 1.3; }
+  .shop-item .price {
+    background: var(--gold);
+    color: #2a1a04;
+    padding: 6px 10px; border-radius: 10px;
+    font-size: 13px; font-weight: 900;
+    white-space: nowrap;
+  }
+
+  /* Lang picker */
+  .lang-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    margin: 6px 0;
+  }
+  .lang-cell {
+    padding: 9px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 10px;
+    font-size: 13px;
+    text-align: center;
+    cursor: pointer;
+  }
+  .lang-cell.active {
+    border-color: var(--gold);
+    background: rgba(255,216,100,0.15);
+  }
+  .lang-cell .flag { font-size: 17px; margin-right: 6px; }
+
+  /* Leaderboard */
+  .lb-tabs {
+    display: flex; gap: 4px; margin-bottom: 10px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 12px;
+    padding: 4px;
+  }
+  .lb-tab {
+    flex: 1; padding: 7px;
+    text-align: center;
+    font-size: 12px; font-weight: 800;
+    letter-spacing: 1px; text-transform: uppercase;
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--text-muted);
+  }
+  .lb-tab.active {
+    background: var(--gold);
+    color: #2a1a04;
+  }
+  .lb-list { max-height: 50vh; overflow-y: auto; }
+  .lb-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 4px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 13px;
+  }
+  .lb-row.me { background: rgba(255,216,100,0.08); border-radius: 8px; padding-left: 8px; }
+  .lb-row .rank {
+    width: 28px; text-align: center;
+    font-weight: 900; color: var(--gold);
+    font-variant-numeric: tabular-nums;
+  }
+  .lb-row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lb-row .score { color: var(--gold); font-weight: 800; font-variant-numeric: tabular-nums; }
+
+  /* Welcome / first-launch */
+  .welcome-grid {
+    display: grid;
+    grid-template-columns: 36px 1fr;
+    gap: 12px;
+    margin: 8px 0;
+    text-align: left;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  .welcome-grid .em { font-size: 28px; text-align: center; }
+  .welcome-grid .lbl { font-weight: 800; color: var(--gold); }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ============ TOPBAR ============ -->
+  <div class="topbar">
+    <div class="left">
+      <div class="pill gold"><span class="em">💰</span><span class="num" id="hud-coins">0</span></div>
+    </div>
+    <div class="right">
+      <div class="gear" id="btn-leaderboard" title="Leaderboard">🏆</div>
+      <div class="gear" id="btn-daily" title="Daily">🎁</div>
+      <div class="gear" id="btn-shop" title="Shop">💎</div>
+      <div class="gear" id="btn-settings" title="Settings">⚙️</div>
+    </div>
+  </div>
+
+  <!-- ============ PRIZE BOX — BIG gold counter ============ -->
+  <div class="prize-box">
+    <div class="prize-label" id="prize-label">GOLD</div>
+    <div class="prize-num" id="prize-num">0</div>
+    <div class="prize-sub" id="prize-sub"></div>
+  </div>
+
+  <!-- ============ GRID CANVAS ============ -->
+  <div id="canvas-wrap">
+    <canvas id="board" width="308" height="308"></canvas>
+  </div>
+
+  <!-- Mega-cascade splash sits above everything inside #canvas-wrap area -->
+  <div class="mega-splash" id="mega-splash"><div class="txt" id="mega-text">MEGA<br/>CASCADE!</div></div>
+
+  <!-- ============ ENERGY ROW (below grid) ============ -->
+  <div class="energy-row" id="energy-row">
+    <div class="energy-icon">⚡</div>
+    <div class="energy-bar"><div class="energy-fill" id="energy-fill"></div></div>
+    <div class="energy-num"><span id="energy-num">30</span>/<span id="energy-max">30</span></div>
+    <div class="energy-timer" id="energy-timer"></div>
+  </div>
+
+  <!-- ============ BET SELECTOR ============ -->
+  <div class="bet-row">
+    <div class="bet-label" data-i18n="bet_label">BET</div>
+    <div class="bet-pills" id="bet-pills"></div>
+  </div>
+
+  <!-- ============ BOOSTER ROW ============ -->
+  <div class="booster-row">
+    <div class="booster" id="bst-double">⚡<span class="cnt" id="cnt-double">0</span></div>
+    <div class="booster" id="bst-wild">🎰<span class="cnt" id="cnt-wild">0</span></div>
+    <div class="booster" id="bst-bag">💰<span class="cnt" id="cnt-bag">0</span></div>
+  </div>
+
+  <!-- ============ MODAL ============ -->
+  <div class="modal-back" id="modal-back">
+    <div class="modal" id="modal"></div>
+  </div>
+
+</div>
+
+<script>
+/* =========================================================
+   [10] Constants — board, scoring, vault tiers, bets
+   ========================================================= */
+
+const VERSION = 'v0.2.0';
+
+// Match3 board — mirrors Match Icon's 7×7 layout.
+const BOARD_COLS = 7;
+const BOARD_ROWS = 7;
+const NUM_COLORS = 6;
+const MIN_MATCH = 3;
+
+const TILE = {
+  COIN_COPPER: 0, COIN_SILVER: 1, COIN_GOLD: 2,
+  GEM_RED: 3, RING: 4, CROWN: 5,
+  MONEY_BAG: 6,    // 3× cell value, ~3% spawn
+  WILD: 7,         // matches any color, ~1% spawn
+  EVENT_DC: 8,     // event token (server-flagged)
+  GAE: 9,          // community accumulation token (server-flagged)
+};
+
+const TILE_VALUE = {
+  [TILE.COIN_COPPER]: 1.0,
+  [TILE.COIN_SILVER]: 1.2,
+  [TILE.COIN_GOLD]:   1.5,
+  [TILE.GEM_RED]:     1.8,
+  [TILE.RING]:        2.0,
+  [TILE.CROWN]:       2.5,
+  [TILE.MONEY_BAG]:   5.0,
+  [TILE.WILD]:        1.0,
+  [TILE.EVENT_DC]:    1.0,
+  [TILE.GAE]:         1.0,
+};
+
+const TILE_EMOJI = {
+  [TILE.COIN_COPPER]: '🪙',
+  [TILE.COIN_SILVER]: '🥈',
+  [TILE.COIN_GOLD]:   '🥇',
+  [TILE.GEM_RED]:     '💎',
+  [TILE.RING]:        '💍',
+  [TILE.CROWN]:       '👑',
+  [TILE.MONEY_BAG]:   '💰',
+  [TILE.WILD]:        '🎰',
+  [TILE.EVENT_DC]:    '⭐',
+  [TILE.GAE]:         '🎁',
+};
+
+// Cascade multiplier per chain step. Depth 4+ triggers MEGA splash.
+const CASCADE_MULT = [1, 1, 1.5, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0];
+
+const MONEY_BAG_SPAWN_P = 0.03;
+const WILD_SPAWN_P = 0.01;
+const EVENT_TILE_SPAWN_P = 0.04;
+
+// Vault tiers — same as v0.1; drives bet-pill unlock + meta progression.
+const VAULT_TIERS = [
+  { name: 'Wooden Chest',   emoji: '📦', threshold: 0,        color: '#a06138' },
+  { name: 'Iron Chest',     emoji: '🗃️', threshold: 1000,     color: '#8c8c8c' },
+  { name: 'Bronze Vault',   emoji: '⚱️', threshold: 5000,     color: '#cd7f32' },
+  { name: 'Silver Vault',   emoji: '🏺', threshold: 25000,    color: '#c0c0c0' },
+  { name: 'Gold Vault',     emoji: '💰', threshold: 100000,   color: '#ffc94a' },
+  { name: 'Diamond Vault',  emoji: '💎', threshold: 500000,   color: '#7fdbff' },
+  { name: 'Royal Treasury', emoji: '👑', threshold: 2000000,  color: '#a263e8' },
+  { name: "Dragon's Hoard", emoji: '🐉', threshold: 10000000, color: '#e84a5f' },
+];
+
+// Bet ladder. Pure multipliers, unlocked by vault tier. No upfront cost —
+// keeping v0.2 simple per Pickle's "no rounds" pivot.
+const BETS = [
+  { mult: 1,    unlockTier: 0, label: '1×' },
+  { mult: 2,    unlockTier: 0, label: '2×' },
+  { mult: 5,    unlockTier: 1, label: '5×' },
+  { mult: 10,   unlockTier: 2, label: '10×' },
+  { mult: 25,   unlockTier: 3, label: '25×' },
+];
+
+// Energy: each successful match (the swap that produces a match group)
+// costs 1. Failed swaps are free. Regen 1 per ENERGY_REGEN_MS.
+const ENERGY_MAX_DEFAULT = 30;
+const ENERGY_REGEN_MS = 90 * 1000;
+
+// Daily chest cycle (7-day). Day-7 is the big push for retention.
+const DAILY_CHEST = [
+  { coins: 200,   energy: 0, em: '💰' },
+  { coins: 400,   energy: 2, em: '⚡' },
+  { coins: 700,   energy: 0, em: '💎' },
+  { coins: 1200,  energy: 5, em: '⚡' },
+  { coins: 2000,  energy: 0, em: '💍' },
+  { coins: 3500,  energy: 0, em: '👑' },
+  { coins: 8000,  energy: 15, em: '🎁' },
+];
+
+const STORAGE_KEY = 'loot-match-save-v2';
+
+/* =========================================================
+   [11] State
+   ========================================================= */
+
+const defaultState = () => ({
+  coins: 500,                  // <— the GOLD counter shown in the prize box
+  gems: 0,
+  energy: ENERGY_MAX_DEFAULT,
+  energyMax: ENERGY_MAX_DEFAULT,
+  energyRegenAt: 0,
+  vaultTier: 0,
+  vaultProgress: 0,
+  vaultLifetimeCoins: 0,
+  skins: ['default'],
+  activeSkin: 'default',
+  betBoosterTokens: 0,
+  wildBoosterTokens: 0,
+  bagBoosterTokens: 0,
+  streak: 0,
+  lastPlayedYMD: '',
+  totalCoinsEver: 0,
+  totalMatchesEver: 0,
+  totalCascadesEver: 0,
+  bestCascadeEver: 0,
+  bestRoundCoinsEver: 0,       // kept for compat with prior save schema
+  dailyChestYMD: '',
+  dailyChestDay: 0,
+  eventTokens: 0,
+  gaeContributed: 0,
+  missions: {},
+  achievements: {},
+  battlePassUntil: 0,
+  firstSeenAt: Date.now(),
+  welcomed: false,
+  lang: 'en',
+  preferredBetIdx: 1,
+});
+
+let state = loadState();
+function loadState() {
+  try {
+    // Try v2 key first; migrate from v1 key if present.
+    let raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) raw = localStorage.getItem('loot-match-save-v1');
+    if (!raw) return defaultState();
+    const obj = JSON.parse(raw);
+    return Object.assign(defaultState(), obj);
+  } catch (e) { return defaultState(); }
+}
+function saveState() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+  serverSyncDebounced();
+}
+
+/* =========================================================
+   [12] i18n — EN + RU full, 18-lang stubs
+   ========================================================= */
+
+const LANGS = [
+  { code: 'en', name: 'English',    flag: '🇬🇧' },
+  { code: 'ru', name: 'Русский',    flag: '🇷🇺' },
+  { code: 'es', name: 'Español',    flag: '🇪🇸' },
+  { code: 'pt', name: 'Português',  flag: '🇵🇹' },
+  { code: 'de', name: 'Deutsch',    flag: '🇩🇪' },
+  { code: 'fr', name: 'Français',   flag: '🇫🇷' },
+  { code: 'it', name: 'Italiano',   flag: '🇮🇹' },
+  { code: 'tr', name: 'Türkçe',     flag: '🇹🇷' },
+  { code: 'pl', name: 'Polski',     flag: '🇵🇱' },
+  { code: 'nl', name: 'Nederlands', flag: '🇳🇱' },
+  { code: 'uk', name: 'Українська', flag: '🇺🇦' },
+  { code: 'ar', name: 'العربية',     flag: '🇸🇦' },
+  { code: 'hi', name: 'हिन्दी',        flag: '🇮🇳' },
+  { code: 'id', name: 'Indonesia',  flag: '🇮🇩' },
+  { code: 'vi', name: 'Tiếng Việt', flag: '🇻🇳' },
+  { code: 'th', name: 'ไทย',         flag: '🇹🇭' },
+  { code: 'ja', name: '日本語',       flag: '🇯🇵' },
+  { code: 'ko', name: '한국어',       flag: '🇰🇷' },
+  { code: 'zh', name: '中文',         flag: '🇨🇳' },
+  { code: 'fa', name: 'فارسی',       flag: '🇮🇷' },
+];
+
+const I18N = {
+  en: {
+    gold: 'GOLD',
+    bet_label: 'BET',
+    not_enough_energy: 'Out of energy. Wait for ⚡ refill or buy more in the shop.',
+    energy_full: 'FULL',
+    cascade_x: 'CASCADE x{n}',
+    mega_cascade: 'MEGA CASCADE!',
+    no_more_moves: 'No moves — reshuffling…',
+    bet_locked: 'Unlocks at {tier}',
+    daily_chest: 'Daily Chest',
+    daily_streak: 'Streak: {n} days',
+    claim: 'Claim',
+    come_back_tomorrow: 'Come back tomorrow!',
+    shop_title: 'Shop',
+    shop_subtitle: 'Stars only · No ads, ever',
+    settings_title: 'Settings',
+    language: 'Language',
+    leaderboard: 'Leaderboard',
+    lb_global: 'Global',
+    lb_today: 'Today',
+    lb_empty: 'Be the first on the board!',
+    you_label: 'You',
+    new_tier: 'NEW VAULT!',
+    tier_reward: '+{n} bonus coins',
+    no_iap: 'IAP disabled in local dev — set BOT_TOKEN to enable.',
+    welcome_title: 'Welcome to Loot Match!',
+    welcome_p1: 'Match 3+ tiles to win coins.',
+    welcome_p2: 'Cascades multiply payouts — chain matches for MEGA wins.',
+    welcome_p3: 'Each match costs ⚡1 energy. Energy refills automatically.',
+    welcome_p4: 'Bet higher for bigger payouts. Higher bets unlock as your vault grows.',
+    lets_go: 'Let\'s Go!',
+    vault_label: 'VAULT',
+  },
+  ru: {
+    gold: 'ЗОЛОТО',
+    bet_label: 'СТАВКА',
+    not_enough_energy: 'Энергия закончилась. Подожди ⚡ или купи в магазине.',
+    energy_full: 'ПОЛНО',
+    cascade_x: 'КАСКАД x{n}',
+    mega_cascade: 'МЕГА-КАСКАД!',
+    no_more_moves: 'Нет ходов — перемешиваю…',
+    bet_locked: 'Откроется на {tier}',
+    daily_chest: 'Ежедневный сундук',
+    daily_streak: 'Серия: {n} дней',
+    claim: 'Забрать',
+    come_back_tomorrow: 'Возвращайся завтра!',
+    shop_title: 'Магазин',
+    shop_subtitle: 'Только Stars · Никакой рекламы',
+    settings_title: 'Настройки',
+    language: 'Язык',
+    leaderboard: 'Лидеры',
+    lb_global: 'Глобально',
+    lb_today: 'Сегодня',
+    lb_empty: 'Будь первым в таблице!',
+    you_label: 'Ты',
+    new_tier: 'НОВОЕ ХРАНИЛИЩЕ!',
+    tier_reward: '+{n} бонусных монет',
+    no_iap: 'Покупки выключены в локальной разработке.',
+    welcome_title: 'Добро пожаловать в Loot Match!',
+    welcome_p1: 'Собирай 3+ плитки в ряд, чтобы получить монеты.',
+    welcome_p2: 'Каскады умножают выигрыш — делай цепные матчи для МЕГА-побед.',
+    welcome_p3: 'Каждый матч стоит ⚡1 энергии. Энергия восстанавливается сама.',
+    welcome_p4: 'Ставь больше — получай больше. Высокие ставки откроются по мере роста хранилища.',
+    lets_go: 'Поехали!',
+    vault_label: 'ХРАНИЛИЩЕ',
+  },
+};
+
+for (const l of LANGS) if (!I18N[l.code]) I18N[l.code] = I18N.en;
+
+function t(key, vars) {
+  const dict = I18N[state.lang] || I18N.en;
+  let s = dict[key] || I18N.en[key] || key;
+  if (vars) for (const k of Object.keys(vars)) s = s.replace('{' + k + '}', vars[k]);
+  return s;
+}
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.getAttribute('data-i18n'));
+  });
+  document.getElementById('prize-label').textContent = t('gold');
+}
+
+/* =========================================================
+   [13] Telegram bridge
+   ========================================================= */
+
+const TG = window.Telegram && window.Telegram.WebApp;
+function tgReady() {
+  if (!TG) return;
+  try {
+    TG.ready();
+    TG.expand();
+    if (TG.requestFullscreen) try { TG.requestFullscreen(); } catch (e) {}
+    if (TG.disableVerticalSwipes) try { TG.disableVerticalSwipes(); } catch (e) {}
+    if (TG.lockOrientation) try { TG.lockOrientation(); } catch (e) {}
+    applySafeArea();
+    if (TG.onEvent) {
+      TG.onEvent('viewportChanged', applySafeArea);
+      TG.onEvent('safeAreaChanged', applySafeArea);
+      TG.onEvent('contentSafeAreaChanged', applySafeArea);
+    }
+    if (state.lang === 'en' && TG.initDataUnsafe && TG.initDataUnsafe.user && TG.initDataUnsafe.user.language_code) {
+      const lc = String(TG.initDataUnsafe.user.language_code).slice(0, 2).toLowerCase();
+      if (I18N[lc]) state.lang = lc;
+    }
+  } catch (e) {}
+}
+function applySafeArea() {
+  if (!TG) return;
+  const csi = TG.contentSafeAreaInset || TG.safeAreaInset || {};
+  const top = Math.max(0, csi.top || 0);
+  const bottom = Math.max(0, csi.bottom || 0);
+  document.documentElement.style.setProperty('--tg-safe-top', top + 'px');
+  document.documentElement.style.setProperty('--tg-safe-bottom', bottom + 'px');
+  resizeBoardCanvas();
+}
+function haptic(kind) {
+  if (!TG || !TG.HapticFeedback) return;
+  try {
+    if (kind === 'tap')     TG.HapticFeedback.impactOccurred('light');
+    else if (kind === 'med')   TG.HapticFeedback.impactOccurred('medium');
+    else if (kind === 'heavy') TG.HapticFeedback.impactOccurred('heavy');
+    else if (kind === 'success') TG.HapticFeedback.notificationOccurred('success');
+    else if (kind === 'err') TG.HapticFeedback.notificationOccurred('error');
+  } catch (e) {}
+}
+
+/* =========================================================
+   [14] Server sync
+   ========================================================= */
+
+let serverSyncTimer = 0;
+function serverSyncDebounced() {
+  if (!TG || !TG.initData) return;
+  clearTimeout(serverSyncTimer);
+  serverSyncTimer = setTimeout(serverSyncNow, 2500);
+}
+async function serverSyncNow() {
+  if (!TG || !TG.initData) return;
+  try {
+    const patch = {};
+    const SYNC_KEYS = ['coins','gems','energy','energyMax','energyRegenAt',
+      'vaultTier','vaultProgress','vaultLifetimeCoins',
+      'skins','activeSkin','betBoosterTokens','wildBoosterTokens','bagBoosterTokens',
+      'streak','lastPlayedYMD','totalCoinsEver','totalMatchesEver','totalCascadesEver',
+      'bestCascadeEver','bestRoundCoinsEver','dailyChestYMD','dailyChestDay',
+      'eventTokens','gaeContributed','missions','achievements','battlePassUntil',
+      'firstSeenAt','welcomed','lang'];
+    for (const k of SYNC_KEYS) patch[k] = state[k];
+    await fetch('/api/state/save', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: TG.initData, patch }),
+    });
+  } catch (e) {}
+}
+async function serverStateLoad() {
+  if (!TG || !TG.initData) return;
+  try {
+    const r = await fetch('/api/state/load', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: TG.initData }),
+    });
+    const d = await r.json();
+    if (d.exists && d.state) {
+      Object.assign(state, d.state);
+      saveState();
+      refreshAllUI();
+    }
+  } catch (e) {}
+}
+
+let IAP_ENABLED = false;
+let SKUS = [];
+let EVENTS = { dc: null, gae: null };
+async function fetchServerFlags() {
+  try {
+    const r = await fetch('/api/flags');
+    const d = await r.json();
+    IAP_ENABLED = !!d.iap;
+  } catch (e) { IAP_ENABLED = false; }
+  try {
+    const r = await fetch('/api/skus');
+    const d = await r.json();
+    SKUS = d.skus || [];
+  } catch (e) {}
+  try {
+    const r = await fetch('/api/events');
+    const d = await r.json();
+    EVENTS = d || {};
+  } catch (e) {}
+}
+async function pollPurchases() {
+  if (!TG || !TG.initData) return;
+  try {
+    const r = await fetch('/api/poll-purchases', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: TG.initData }),
+    });
+    const d = await r.json();
+    if (d.purchases && d.purchases.length) {
+      for (const p of d.purchases) applyGrant(p.grant);
+      saveState();
+      refreshAllUI();
+      toast('Purchase received!');
+    }
+  } catch (e) {}
+}
+function applyGrant(g) {
+  if (!g) return;
+  if (g.coins) { state.coins += g.coins; pulsePrize(); }
+  if (g.gems)  state.gems  += g.gems;
+  if (g.energy) state.energy = Math.min(state.energyMax + g.energy, state.energy + g.energy);
+  if (g.energyMax) state.energyMax += g.energyMax;
+  if (g.skins) for (const s of g.skins) if (!state.skins.includes(s)) state.skins.push(s);
+  if (g.betBoosterTokens)  state.betBoosterTokens  += g.betBoosterTokens;
+  if (g.wildBoosterTokens) state.wildBoosterTokens += g.wildBoosterTokens;
+  if (g.bagBoosterTokens)  state.bagBoosterTokens  += g.bagBoosterTokens;
+  if (g.battlePass) state.battlePassUntil = Date.now() + g.battlePass * 24 * 60 * 60 * 1000;
+}
+async function buySku(sku) {
+  if (!IAP_ENABLED) { toast(t('no_iap')); return; }
+  if (!TG || !TG.initData) { toast(t('no_iap')); return; }
+  try {
+    const r = await fetch('/api/create-invoice', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: TG.initData, sku }),
+    });
+    const d = await r.json();
+    if (d.link && TG.openInvoice) {
+      TG.openInvoice(d.link, (status) => {
+        if (status === 'paid') {
+          setTimeout(pollPurchases, 1200);
+          setTimeout(pollPurchases, 3500);
+        }
+      });
+    } else toast('Could not open invoice');
+  } catch (e) { toast('Purchase failed'); }
+}
+
+/* =========================================================
+   [15] Energy regen (per-second wall-clock tick)
+   ========================================================= */
+
+function tickEnergy() {
+  if (state.energy >= state.energyMax) { state.energyRegenAt = 0; return; }
+  const now = Date.now();
+  if (!state.energyRegenAt) state.energyRegenAt = now + ENERGY_REGEN_MS;
+  while (state.energyRegenAt && now >= state.energyRegenAt && state.energy < state.energyMax) {
+    state.energy++;
+    state.energyRegenAt += ENERGY_REGEN_MS;
+  }
+  if (state.energy >= state.energyMax) state.energyRegenAt = 0;
+}
+function energyCountdownStr() {
+  if (state.energy >= state.energyMax) return t('energy_full');
+  const ms = (state.energyRegenAt || 0) - Date.now();
+  if (ms <= 0) return '';
+  const m = Math.floor(ms / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  return m + ':' + String(s).padStart(2, '0');
+}
+setInterval(() => {
+  const had = state.energy;
+  tickEnergy();
+  if (had !== state.energy) { saveState(); }
+  refreshEnergyUI();
+}, 1000);
+
+/* =========================================================
+   [16] Match3 engine — 7×7 grid, swap-to-match, cascades
+   ========================================================= */
+
+let board = [];
+
+function makeEmptyBoard() {
+  const b = new Array(BOARD_ROWS);
+  for (let r = 0; r < BOARD_ROWS; r++) b[r] = new Array(BOARD_COLS).fill(-1);
+  return b;
+}
+function spawnFreshBoard() {
+  board = makeEmptyBoard();
+  for (let r = 0; r < BOARD_ROWS; r++) {
+    for (let c = 0; c < BOARD_COLS; c++) {
+      board[r][c] = pickFreshTile(r, c);
+    }
+  }
+}
+function pickFreshTile(r, c) {
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const tl = Math.floor(Math.random() * NUM_COLORS);
+    if (c >= 2 && board[r][c - 1] === tl && board[r][c - 2] === tl) continue;
+    if (r >= 2 && board[r - 1][c] === tl && board[r - 2][c] === tl) continue;
+    return tl;
+  }
+  return Math.floor(Math.random() * NUM_COLORS);
+}
+function pickReplenishTile() {
+  const r = Math.random();
+  if (EVENTS.dc && EVENTS.dc.active && r < EVENT_TILE_SPAWN_P) return TILE.EVENT_DC;
+  if (EVENTS.gae && EVENTS.gae.active && r < EVENT_TILE_SPAWN_P * 2) return TILE.GAE;
+  if (r < MONEY_BAG_SPAWN_P) return TILE.MONEY_BAG;
+  if (r < MONEY_BAG_SPAWN_P + WILD_SPAWN_P) return TILE.WILD;
+  return Math.floor(Math.random() * NUM_COLORS);
+}
+function tilesMatch(a, b) {
+  if (a === -1 || b === -1) return false;
+  if (a === TILE.WILD || b === TILE.WILD) return true;
+  return a === b;
+}
+function findMatches() {
+  const cells = new Set();
+  let groups = 0;
+  // Horizontal
+  for (let r = 0; r < BOARD_ROWS; r++) {
+    let s = 0;
+    for (let c = 1; c <= BOARD_COLS; c++) {
+      const cont = c < BOARD_COLS && tilesMatch(board[r][s], board[r][c]);
+      if (!cont) {
+        const len = c - s;
+        if (len >= MIN_MATCH) { groups++; for (let k = s; k < c; k++) cells.add(r + ',' + k); }
+        s = c;
+      }
+    }
+  }
+  // Vertical
+  for (let c = 0; c < BOARD_COLS; c++) {
+    let s = 0;
+    for (let r = 1; r <= BOARD_ROWS; r++) {
+      const cont = r < BOARD_ROWS && tilesMatch(board[s][c], board[r][c]);
+      if (!cont) {
+        const len = r - s;
+        if (len >= MIN_MATCH) { groups++; for (let k = s; k < r; k++) cells.add(k + ',' + c); }
+        s = r;
+      }
+    }
+  }
+  return { cells, groups };
+}
+function trySwap(r1, c1, r2, c2) {
+  if (Math.abs(r1 - r2) + Math.abs(c1 - c2) !== 1) return false;
+  const tmp = board[r1][c1]; board[r1][c1] = board[r2][c2]; board[r2][c2] = tmp;
+  const m = findMatches();
+  if (m.cells.size === 0) {
+    const tmp2 = board[r1][c1]; board[r1][c1] = board[r2][c2]; board[r2][c2] = tmp2;
+    return false;
+  }
+  return true;
+}
+function applyGravity() {
+  for (let c = 0; c < BOARD_COLS; c++) {
+    let wr = BOARD_ROWS - 1;
+    for (let r = BOARD_ROWS - 1; r >= 0; r--) {
+      if (board[r][c] !== -1) {
+        if (r !== wr) { board[wr][c] = board[r][c]; board[r][c] = -1; }
+        wr--;
+      }
+    }
+    for (let r = wr; r >= 0; r--) board[r][c] = pickReplenishTile();
+  }
+}
+function hasPossibleMove() {
+  for (let r = 0; r < BOARD_ROWS; r++) {
+    for (let c = 0; c < BOARD_COLS; c++) {
+      const tries = [[r, c, r, c + 1], [r, c, r + 1, c]];
+      for (const [a, b, x, y] of tries) {
+        if (x >= BOARD_ROWS || y >= BOARD_COLS) continue;
+        const tmp = board[a][b]; board[a][b] = board[x][y]; board[x][y] = tmp;
+        const m = findMatches();
+        const tmp2 = board[a][b]; board[a][b] = board[x][y]; board[x][y] = tmp2;
+        if (m.cells.size > 0) return true;
+      }
+    }
+  }
+  return false;
+}
+function reshuffle() {
+  const all = [];
+  for (let r = 0; r < BOARD_ROWS; r++) for (let c = 0; c < BOARD_COLS; c++) all.push(board[r][c]);
+  for (let i = all.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = all[i]; all[i] = all[j]; all[j] = tmp;
+  }
+  for (let attempt = 0; attempt < 6; attempt++) {
+    let idx = 0;
+    for (let r = 0; r < BOARD_ROWS; r++) for (let c = 0; c < BOARD_COLS; c++) board[r][c] = all[idx++];
+    if (findMatches().cells.size === 0 && hasPossibleMove()) return;
+    for (let i = all.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = all[i]; all[i] = all[j]; all[j] = tmp;
+    }
+  }
+  spawnFreshBoard();
+}
+
+/* =========================================================
+   [17] Continuous-play game loop (no rounds)
+   ========================================================= */
+
+const game = {
+  busy: false,
+  selected: null,             // {r,c} tap-tap mode
+  doubleBetArmed: false,      // ⚡ booster: doubles bet multiplier for next match
+  wildPending: false,         // 🎰 booster: convert next swapped-to cell into a wild
+  cascadeDepth: 0,            // current chain depth, reset per match resolution
+};
+
+function effectiveBetMult() {
+  const b = BETS[clampedBetIdx()];
+  return (b ? b.mult : 1) * (game.doubleBetArmed ? 2 : 1);
+}
+function clampedBetIdx() {
+  let idx = state.preferredBetIdx;
+  if (idx < 0) idx = 0;
+  if (idx >= BETS.length) idx = BETS.length - 1;
+  if (state.vaultTier < BETS[idx].unlockTier) {
+    // Snap down to highest unlocked.
+    for (let i = idx; i >= 0; i--) if (state.vaultTier >= BETS[i].unlockTier) return i;
+    return 0;
+  }
+  return idx;
+}
+
+function attemptSwap(r1, c1, r2, c2) {
+  if (game.busy) return;
+  if (state.energy <= 0) {
+    haptic('err');
+    toast(t('not_enough_energy'));
+    flashEnergyEmpty();
+    return;
+  }
+  // Wild booster: convert destination cell into wild before swap-validation.
+  if (game.wildPending) {
+    board[r2][c2] = TILE.WILD;
+    state.wildBoosterTokens--;
+    game.wildPending = false;
+    setBoosterArmed('wild', false);
+  }
+  const ok = trySwap(r1, c1, r2, c2);
+  if (!ok) {
+    haptic('err');
+    renderBoard(new Set([r1 + ',' + c1, r2 + ',' + c2]));
+    setTimeout(renderBoard, 140);
+    return;
+  }
+  // Spend 1 energy on a successful match-producing swap.
+  state.energy--;
+  if (state.energy < state.energyMax && !state.energyRegenAt) {
+    state.energyRegenAt = Date.now() + ENERGY_REGEN_MS;
+  }
+  renderBoard();
+  refreshEnergyUI();
+  resolveSwapMatches();
+}
+
+async function resolveSwapMatches() {
+  game.busy = true;
+  game.cascadeDepth = 0;
+  while (true) {
+    const m = findMatches();
+    if (m.cells.size === 0) break;
+    game.cascadeDepth++;
+    state.totalMatchesEver += m.groups;
+    if (game.cascadeDepth > state.bestCascadeEver) state.bestCascadeEver = game.cascadeDepth;
+
+    const mult = CASCADE_MULT[Math.min(game.cascadeDepth, CASCADE_MULT.length - 1)];
+    const betMult = effectiveBetMult();
+    let stepCoins = 0;
+    const flyCoords = [];
+    let gaeRoundContribution = 0;
+    let eventRoundTokens = 0;
+
+    for (const key of m.cells) {
+      const [r, c] = key.split(',').map(Number);
+      const tile = board[r][c];
+      const cellVal = TILE_VALUE[tile] || 1;
+      const earn = cellVal * betMult * mult;
+      stepCoins += earn;
+      flyCoords.push({ r, c, earn });
+      if (tile === TILE.EVENT_DC) eventRoundTokens++;
+      if (tile === TILE.GAE)      gaeRoundContribution++;
+    }
+
+    // Apply earnings LIVE — gold counter ticks up immediately, not at end.
+    const earnedInt = Math.floor(stepCoins);
+    state.coins += earnedInt;
+    state.totalCoinsEver += earnedInt;
+    state.vaultLifetimeCoins += earnedInt;
+    state.eventTokens += eventRoundTokens;
+    if (gaeRoundContribution > 0) {
+      state.gaeContributed += gaeRoundContribution;
+      if (TG && TG.initData) {
+        fetch('/api/gae/contribute', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ initData: TG.initData, amount: gaeRoundContribution }),
+        }).catch(() => {});
+      }
+    }
+
+    // Visual + haptic
+    if (game.cascadeDepth === 1)      haptic('tap');
+    else if (game.cascadeDepth === 2) haptic('med');
+    else if (game.cascadeDepth === 3) haptic('heavy');
+    else if (game.cascadeDepth >= 4) { haptic('success'); flashMegaCascade(); }
+    showCascadeLabel(game.cascadeDepth, mult);
+    drawFloatingCoins(flyCoords);
+    pulsePrize();
+    refreshPrizeNum();
+
+    // Clear matched cells with a brief highlight, then drop new tiles.
+    for (const key of m.cells) {
+      const [r, c] = key.split(',').map(Number);
+      board[r][c] = -1;
+    }
+    renderBoard(m.cells);
+    await wait(220);
+    applyGravity();
+    renderBoard();
+    await wait(170);
+  }
+
+  // Cascade ended. Show vault progress in the prize sub.
+  game.cascadeDepth = 0;
+  game.doubleBetArmed = false;
+  setBoosterArmed('double', false);
+  hideCascadeLabel();
+  refreshPrizeSubTier();
+
+  // Tier-up check (no end-of-round; just check after every cascade resolution).
+  const oldTier = state.vaultTier;
+  let newTier = oldTier;
+  while (newTier + 1 < VAULT_TIERS.length && state.vaultLifetimeCoins >= VAULT_TIERS[newTier + 1].threshold) {
+    newTier++;
+  }
+  if (newTier > oldTier) {
+    state.vaultTier = newTier;
+    const bonus = 500 * Math.pow(2, newTier);
+    state.coins += bonus;
+    state.totalCoinsEver += bonus;
+    showTierUpModal(VAULT_TIERS[newTier], bonus);
+    refreshAllUI();
+  }
+  state.vaultProgress = state.vaultLifetimeCoins - VAULT_TIERS[state.vaultTier].threshold;
+
+  // Reshuffle if board is now dead.
+  if (!hasPossibleMove()) {
+    toast(t('no_more_moves'));
+    await wait(500);
+    reshuffle();
+    renderBoard();
+  }
+
+  // Submit lifetime-coin leaderboard score quietly (debounced via state save).
+  if (TG && TG.initData) {
+    fetch('/api/score/submit', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: TG.initData, score: state.vaultLifetimeCoins, mode: 'regular' }),
+    }).catch(() => {});
+  }
+
+  game.busy = false;
+  saveState();
+  refreshAllUI();
+}
+
+function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+/* =========================================================
+   [18] Canvas rendering — emoji-on-dark, no cell rects
+   ========================================================= */
+
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+let cellPx = 44;
+
+function resizeBoardCanvas() {
+  const wrap = document.getElementById('canvas-wrap');
+  if (!wrap) return;
+  const rect = wrap.getBoundingClientRect();
+  const avail = Math.min(rect.width - 12, rect.height - 12);
+  const size = Math.max(238, Math.min(420, Math.floor(avail / BOARD_COLS) * BOARD_COLS));
+  canvas.style.width = size + 'px';
+  canvas.style.height = size + 'px';
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = size * dpr;
+  canvas.height = size * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  cellPx = Math.floor(size / BOARD_COLS);
+  renderBoard();
+}
+
+function renderBoard(highlightCells) {
+  if (!ctx) return;
+  const cssSize = parseInt(canvas.style.width || '308', 10);
+  ctx.clearRect(0, 0, cssSize, cssSize);
+
+  for (let r = 0; r < BOARD_ROWS; r++) {
+    for (let c = 0; c < BOARD_COLS; c++) {
+      const tl = board[r][c];
+      if (tl === -1) continue;
+      const x = c * cellPx;
+      const y = r * cellPx;
+      const isSelected = game.selected && game.selected.r === r && game.selected.c === c;
+      const isHighlight = highlightCells && highlightCells.has(r + ',' + c);
+      drawTile(tl, x, y, cellPx, isSelected, isHighlight);
+    }
+  }
+
+  if (game.selected) {
+    const r = game.selected.r, c = game.selected.c;
+    const x = c * cellPx, y = r * cellPx;
+    ctx.save();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#ffd864';
+    ctx.shadowColor = '#ffd864';
+    ctx.shadowBlur = 12;
+    if (typeof ctx.roundRect === 'function') {
+      ctx.beginPath();
+      ctx.roundRect(x + 3, y + 3, cellPx - 6, cellPx - 6, cellPx * 0.18);
+      ctx.stroke();
+    } else {
+      ctx.strokeRect(x + 3, y + 3, cellPx - 6, cellPx - 6);
+    }
+    ctx.restore();
+  }
+}
+
+function drawTile(t, x, y, size, selected, highlighted) {
+  const emoji = TILE_EMOJI[t] || '?';
+  ctx.save();
+  // Highlight flash: white glow on cells being cleared this frame.
+  if (highlighted) {
+    ctx.fillStyle = 'rgba(255,255,255,0.30)';
+    if (typeof ctx.roundRect === 'function') {
+      ctx.beginPath();
+      ctx.roundRect(x + 2, y + 2, size - 4, size - 4, size * 0.18);
+      ctx.fill();
+    } else {
+      ctx.fillRect(x + 2, y + 2, size - 4, size - 4);
+    }
+  }
+  // Drop shadow under emoji (cheap, no offscreen cache for v0.2).
+  ctx.shadowColor = 'rgba(0,0,0,0.55)';
+  ctx.shadowBlur = 4;
+  ctx.shadowOffsetY = 2;
+  ctx.font = `${Math.floor(size * 0.78)}px -apple-system, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", system-ui`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#000';
+  ctx.fillText(emoji, x + size / 2, y + size / 2 + size * 0.02);
+  ctx.restore();
+}
+
+window.addEventListener('resize', resizeBoardCanvas);
+
+/* =========================================================
+   [19] Input — tap-tap + swipe to swap
+   ========================================================= */
+
+function getCellFromPointer(ev) {
+  const rect = canvas.getBoundingClientRect();
+  const cssSize = rect.width;
+  const cellCss = cssSize / BOARD_COLS;
+  const x = ev.clientX - rect.left;
+  const y = ev.clientY - rect.top;
+  const c = Math.floor(x / cellCss);
+  const r = Math.floor(y / cellCss);
+  if (r < 0 || r >= BOARD_ROWS || c < 0 || c >= BOARD_COLS) return null;
+  return { r, c };
+}
+
+let touchStart = null;
+canvas.addEventListener('pointerdown', (ev) => {
+  ev.preventDefault();
+  if (game.busy) return;
+  const cell = getCellFromPointer(ev);
+  if (!cell) return;
+  touchStart = Object.assign({}, cell, { x: ev.clientX, y: ev.clientY });
+  if (game.selected) {
+    if (Math.abs(game.selected.r - cell.r) + Math.abs(game.selected.c - cell.c) === 1) {
+      const from = game.selected;
+      game.selected = null;
+      renderBoard();
+      attemptSwap(from.r, from.c, cell.r, cell.c);
+      return;
+    } else if (game.selected.r === cell.r && game.selected.c === cell.c) {
+      game.selected = null;
+      renderBoard();
+      return;
+    }
+  }
+  game.selected = cell;
+  renderBoard();
+});
+canvas.addEventListener('pointerup', (ev) => {
+  if (!touchStart || game.busy) { touchStart = null; return; }
+  const dx = ev.clientX - touchStart.x;
+  const dy = ev.clientY - touchStart.y;
+  const adx = Math.abs(dx), ady = Math.abs(dy);
+  const THRESH = 18;
+  if (adx > THRESH || ady > THRESH) {
+    const from = { r: touchStart.r, c: touchStart.c };
+    let to;
+    if (adx > ady) to = { r: from.r, c: from.c + (dx > 0 ? 1 : -1) };
+    else to = { r: from.r + (dy > 0 ? 1 : -1), c: from.c };
+    if (to.r >= 0 && to.r < BOARD_ROWS && to.c >= 0 && to.c < BOARD_COLS) {
+      game.selected = null;
+      renderBoard();
+      attemptSwap(from.r, from.c, to.r, to.c);
+    }
+  }
+  touchStart = null;
+});
+canvas.addEventListener('pointercancel', () => { touchStart = null; });
+
+/* =========================================================
+   [20] VFX — float coins, cascade label, mega splash, prize pulse
+   ========================================================= */
+
+function drawFloatingCoins(coords) {
+  const rect = canvas.getBoundingClientRect();
+  const cellCss = rect.width / BOARD_COLS;
+  const prizeRect = document.getElementById('prize-num').getBoundingClientRect();
+  const targetX = prizeRect.left + prizeRect.width / 2;
+  const targetY = prizeRect.top + prizeRect.height / 2;
+  for (const co of coords) {
+    const el = document.createElement('div');
+    el.className = 'float-coin';
+    el.textContent = '+' + Math.floor(co.earn);
+    const cx = rect.left + (co.c + 0.5) * cellCss;
+    const cy = rect.top + (co.r + 0.5) * cellCss;
+    el.style.left = (cx - 18) + 'px';
+    el.style.top  = (cy - 10) + 'px';
+    document.body.appendChild(el);
+    const dx = targetX - cx;
+    const dy = targetY - cy;
+    requestAnimationFrame(() => {
+      el.style.transform = 'translate(' + (dx * 0.65) + 'px, ' + (dy * 0.65) + 'px) scale(0.8)';
+      el.style.opacity = '0';
+    });
+    setTimeout(() => el.remove(), 750);
+  }
+}
+
+function showCascadeLabel(depth, mult) {
+  if (depth < 2) return;
+  const sub = document.getElementById('prize-sub');
+  const fmt = mult % 1 === 0 ? String(mult) : mult.toFixed(1).replace(/\.0$/, '');
+  sub.textContent = depth >= 4
+    ? (t('mega_cascade') + ' x' + fmt)
+    : t('cascade_x', { n: fmt });
+  sub.className = 'prize-sub show cascade';
+}
+function hideCascadeLabel() {
+  const sub = document.getElementById('prize-sub');
+  sub.className = 'prize-sub';
+  sub.textContent = '';
+}
+function flashMegaCascade() {
+  const splash = document.getElementById('mega-splash');
+  document.getElementById('mega-text').textContent = t('mega_cascade');
+  splash.classList.add('show');
+  setTimeout(() => splash.classList.remove('show'), 1100);
+}
+
+let prizePulseTimer = 0;
+function pulsePrize() {
+  const el = document.getElementById('prize-num');
+  el.classList.add('pulse');
+  clearTimeout(prizePulseTimer);
+  prizePulseTimer = setTimeout(() => el.classList.remove('pulse'), 220);
+}
+
+function flashEnergyEmpty() {
+  const row = document.getElementById('energy-row');
+  row.classList.add('empty');
+  setTimeout(() => row.classList.remove('empty'), 600);
+}
+
+/* =========================================================
+   [21] UI refresh
+   ========================================================= */
+
+function refreshAllUI() {
+  refreshPrizeNum();
+  refreshHud();
+  refreshEnergyUI();
+  refreshBetPills();
+  refreshBoosterCounts();
+  refreshPrizeSubTier();
+}
+function refreshPrizeNum() {
+  document.getElementById('prize-num').textContent = fmtNum(state.coins);
+  document.getElementById('hud-coins').textContent = fmtNum(state.coins);
+}
+function refreshHud() {
+  document.getElementById('hud-coins').textContent = fmtNum(state.coins);
+}
+function refreshEnergyUI() {
+  document.getElementById('energy-num').textContent = state.energy;
+  document.getElementById('energy-max').textContent = state.energyMax;
+  document.getElementById('energy-fill').style.width = (state.energy / state.energyMax * 100) + '%';
+  document.getElementById('energy-timer').textContent = energyCountdownStr();
+  document.getElementById('energy-row').classList.toggle('empty', state.energy <= 0);
+}
+function refreshBetPills() {
+  const wrap = document.getElementById('bet-pills');
+  wrap.innerHTML = '';
+  const activeIdx = clampedBetIdx();
+  BETS.forEach((b, i) => {
+    const locked = state.vaultTier < b.unlockTier;
+    const el = document.createElement('div');
+    el.className = 'bet-pill' + (i === activeIdx ? ' active' : '') + (locked ? ' locked' : '');
+    el.innerHTML = b.label + (locked ? '<div class="lock">🔒</div>' : '');
+    el.addEventListener('click', () => {
+      if (locked) {
+        toast(t('bet_locked', { tier: VAULT_TIERS[b.unlockTier].name }));
+        haptic('err');
+        return;
+      }
+      state.preferredBetIdx = i;
+      saveState();
+      refreshBetPills();
+      haptic('tap');
+    });
+    wrap.appendChild(el);
+  });
+}
+function refreshBoosterCounts() {
+  document.getElementById('cnt-double').textContent = state.betBoosterTokens;
+  document.getElementById('cnt-wild').textContent   = state.wildBoosterTokens;
+  document.getElementById('cnt-bag').textContent    = state.bagBoosterTokens;
+  document.getElementById('bst-double').classList.toggle('empty', state.betBoosterTokens  <= 0);
+  document.getElementById('bst-wild').classList.toggle('empty',   state.wildBoosterTokens <= 0);
+  document.getElementById('bst-bag').classList.toggle('empty',    state.bagBoosterTokens  <= 0);
+}
+function refreshPrizeSubTier() {
+  // Show current vault tier in the prize sub when no cascade is running.
+  if (game.cascadeDepth > 0) return;
+  const tier = VAULT_TIERS[state.vaultTier];
+  const sub = document.getElementById('prize-sub');
+  if (!tier) return;
+  sub.textContent = tier.emoji + ' ' + tier.name.toUpperCase();
+  sub.className = 'prize-sub show tier';
+}
+function fmtNum(n) {
+  n = Math.floor(n);
+  if (n >= 1e9) return (n / 1e9).toFixed(1).replace(/\.0$/, '') + 'B';
+  if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (n >= 1e4) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
+  return n.toLocaleString('en-US');
+}
+
+/* =========================================================
+   [22] Modals — welcome, daily, shop, settings, leaderboard, tier-up
+   ========================================================= */
+
+const modalBack = document.getElementById('modal-back');
+const modalEl = document.getElementById('modal');
+function openModal(html) {
+  modalEl.innerHTML = '<div class="modal-close" id="modal-close">×</div>' + html;
+  modalBack.classList.add('show');
+  const closeBtn = document.getElementById('modal-close');
+  if (closeBtn) closeBtn.addEventListener('click', closeModal);
+}
+function closeModal() { modalBack.classList.remove('show'); }
+modalBack.addEventListener('click', (ev) => { if (ev.target === modalBack) closeModal(); });
+
+function showWelcomeModal() {
+  const html =
+    '<h2>' + t('welcome_title') + '</h2>' +
+    '<div class="welcome-grid">' +
+      '<div class="em">💰</div><div><div class="lbl">Match</div>' + t('welcome_p1') + '</div>' +
+      '<div class="em">⚡</div><div><div class="lbl">Cascade</div>' + t('welcome_p2') + '</div>' +
+      '<div class="em">🔋</div><div><div class="lbl">Energy</div>' + t('welcome_p3') + '</div>' +
+      '<div class="em">📈</div><div><div class="lbl">Bet</div>' + t('welcome_p4') + '</div>' +
+    '</div>' +
+    '<div class="actions"><button class="btn" id="wel-ok">' + t('lets_go') + '</button></div>';
+  openModal(html);
+  document.getElementById('wel-ok').addEventListener('click', () => {
+    state.welcomed = true;
+    saveState();
+    closeModal();
+  });
+}
+
+function showTierUpModal(tier, bonus) {
+  haptic('success');
+  const html =
+    '<div class="tier-up">' +
+      '<h2>' + t('new_tier') + '</h2>' +
+      '<div class="big">' + tier.emoji + '</div>' +
+      '<div class="new-name">' + tier.name + '</div>' +
+      '<div class="sub">' + t('tier_reward', { n: fmtNum(bonus) }) + '</div>' +
+      '<div class="actions"><button class="btn" id="tu-ok">' + t('lets_go') + '</button></div>' +
+    '</div>';
+  openModal(html);
+  document.getElementById('tu-ok').addEventListener('click', closeModal);
+}
+
+/* Daily chest */
+function todayYMD() {
+  const d = new Date();
+  return d.getUTCFullYear() + '-' + String(d.getUTCMonth()+1).padStart(2,'0') + '-' + String(d.getUTCDate()).padStart(2,'0');
+}
+function yesterdayYMD() {
+  const d = new Date(); d.setUTCDate(d.getUTCDate() - 1);
+  return d.getUTCFullYear() + '-' + String(d.getUTCMonth()+1).padStart(2,'0') + '-' + String(d.getUTCDate()).padStart(2,'0');
+}
+function canClaimDaily() { return state.dailyChestYMD !== todayYMD(); }
+function nextChestDay() {
+  if (state.dailyChestDay >= 7) return 1;
+  if (state.dailyChestYMD && state.dailyChestYMD !== yesterdayYMD()) return 1;
+  return state.dailyChestDay + 1;
+}
+function showDailyModal() {
+  const next = nextChestDay();
+  const claimable = canClaimDaily();
+  let cells = '';
+  for (let i = 0; i < 7; i++) {
+    const day = i + 1;
+    const item = DAILY_CHEST[i];
+    const isToday = (claimable && day === next) || (!claimable && day === state.dailyChestDay);
+    const claimedByPrior = !claimable && day < state.dailyChestDay;
+    const futureDay = claimable ? (day > next) : (day > state.dailyChestDay);
+    cells +=
+      '<div class="chest-day' +
+        (isToday ? ' today' : '') +
+        (claimedByPrior ? ' claimed' : '') +
+        (futureDay ? ' future' : '') + '">' +
+        '<div class="d">' + day + '</div>' +
+        '<div class="em">' + item.em + '</div>' +
+        '<div class="amt">+' + fmtNum(item.coins) +
+          (item.energy ? ' ⚡' + item.energy : '') +
+        '</div>' +
+      '</div>';
+  }
+  const html =
+    '<h2>' + t('daily_chest') + '</h2>' +
+    '<div class="sub">' + t('daily_streak', { n: state.streak }) + '</div>' +
+    '<div class="chest-grid">' + cells + '</div>' +
+    '<div class="actions">' +
+      (claimable
+        ? '<button class="btn" id="claim-daily">' + t('claim') + ' · Day ' + next + '</button>'
+        : '<div style="text-align:center;color:var(--text-muted);">' + t('come_back_tomorrow') + '</div>') +
+    '</div>';
+  openModal(html);
+  if (claimable) {
+    document.getElementById('claim-daily').addEventListener('click', () => {
+      claimDaily();
+      closeModal();
+    });
+  }
+}
+function claimDaily() {
+  if (!canClaimDaily()) return;
+  const next = nextChestDay();
+  const item = DAILY_CHEST[next - 1];
+  if (state.dailyChestYMD === yesterdayYMD()) state.streak = (state.streak || 0) + 1;
+  else state.streak = 1;
+  state.coins += item.coins;
+  state.totalCoinsEver += item.coins;
+  if (item.energy) state.energy = Math.min(state.energyMax + item.energy, state.energy + item.energy);
+  state.dailyChestYMD = todayYMD();
+  state.dailyChestDay = next;
+  saveState();
+  refreshAllUI();
+  pulsePrize();
+  haptic('success');
+  toast('+' + fmtNum(item.coins) + ' 💰' + (item.energy ? ' +' + item.energy + ' ⚡' : ''));
+}
+
+/* Shop */
+function showShopModal() {
+  const items = SKUS.length ? SKUS : [
+    { id: 'starter_pack',  title: 'Starter Pack',      description: '10,000 coins + 5 ⚡ + Pirate skin', price: 199 },
+    { id: 'coins_small',   title: '5,000 Coins',       description: 'Coin Pile', price: 99 },
+    { id: 'coins_medium',  title: '20,000 Coins',      description: '+25% bonus', price: 299 },
+    { id: 'coins_large',   title: '50,000 Coins',      description: '+40% bonus', price: 599 },
+    { id: 'coins_mega',    title: '100,000 Coins',     description: '+60% bonus', price: 999 },
+    { id: 'energy_refill', title: 'Energy Refill +5',  description: 'Instant refill', price: 40 },
+    { id: 'bet_booster',   title: 'Double-Bet ×5',     description: '2× bet for one match', price: 99 },
+    { id: 'wild_booster',  title: 'Wild Tile ×5',      description: 'Place a wild on the board', price: 99 },
+    { id: 'bag_booster',   title: 'Money-Bag ×5',      description: 'Seed 3 money bags', price: 149 },
+  ];
+  const icons = {
+    starter_pack: '🎁', coins_small: '💰', coins_medium: '💰', coins_large: '💰', coins_mega: '💰',
+    energy_refill: '⚡', bet_booster: '⚡', wild_booster: '🎰', bag_booster: '💰',
+    skin_pirate: '🏴‍☠️', skin_dragon: '🐉', skin_royal: '👑', battle_pass: '⭐', test_purchase: '🧪',
+  };
+  let rows = '';
+  for (const it of items) {
+    const featured = it.id === 'starter_pack' ? ' featured' : '';
+    rows +=
+      '<div class="shop-item' + featured + '" data-sku="' + it.id + '">' +
+        '<div class="ico">' + (icons[it.id] || '💎') + '</div>' +
+        '<div class="info">' +
+          '<div class="ti">' + it.title + '</div>' +
+          '<div class="desc">' + it.description + '</div>' +
+        '</div>' +
+        '<div class="price">' + it.price + ' ⭐</div>' +
+      '</div>';
+  }
+  const html =
+    '<h2>' + t('shop_title') + '</h2>' +
+    '<div class="sub">' + t('shop_subtitle') + '</div>' +
+    rows +
+    (IAP_ENABLED ? '' : '<div style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:8px;background:rgba(255,255,255,0.04);padding:6px;border-radius:8px;">' + t('no_iap') + '</div>');
+  openModal(html);
+  modalEl.querySelectorAll('.shop-item').forEach(el => {
+    el.addEventListener('click', () => buySku(el.getAttribute('data-sku')));
+  });
+}
+
+/* Settings */
+function showSettingsModal() {
+  const currentLang = LANGS.find(l => l.code === state.lang);
+  const html =
+    '<h2>' + t('settings_title') + '</h2>' +
+    '<div class="row"><div>' + t('language') + '</div><div style="color:var(--text-muted);">' + (currentLang ? currentLang.name : state.lang) + '</div></div>' +
+    '<div class="lang-grid" id="lang-grid"></div>' +
+    '<div class="row" style="margin-top:12px;"><div style="color:var(--text-muted);">Version</div><div style="color:var(--text-muted);">' + VERSION + '</div></div>';
+  openModal(html);
+  const grid = document.getElementById('lang-grid');
+  for (const l of LANGS) {
+    const cell = document.createElement('div');
+    cell.className = 'lang-cell' + (l.code === state.lang ? ' active' : '');
+    cell.innerHTML = '<span class="flag">' + l.flag + '</span>' + l.name;
+    cell.addEventListener('click', () => {
+      state.lang = l.code;
+      saveState();
+      applyI18n();
+      refreshAllUI();
+      closeModal();
+      setTimeout(showSettingsModal, 80);
+    });
+    grid.appendChild(cell);
+  }
+}
+
+/* Leaderboard */
+let lbMode = 'regular';
+async function showLeaderboardModal() {
+  const html =
+    '<h2>' + t('leaderboard') + '</h2>' +
+    '<div class="lb-tabs">' +
+      '<div class="lb-tab' + (lbMode === 'regular' ? ' active' : '') + '" data-m="regular">' + t('lb_global') + '</div>' +
+      '<div class="lb-tab' + (lbMode === 'daily' ? ' active' : '') + '" data-m="daily">' + t('lb_today') + '</div>' +
+    '</div>' +
+    '<div class="lb-list" id="lb-list">…</div>';
+  openModal(html);
+  modalEl.querySelectorAll('.lb-tab').forEach(el => {
+    el.addEventListener('click', () => {
+      lbMode = el.getAttribute('data-m');
+      showLeaderboardModal();
+    });
+  });
+  try {
+    const r = await fetch('/api/leaderboard?mode=' + lbMode);
+    const d = await r.json();
+    renderLeaderboard(d.top || []);
+  } catch (e) { document.getElementById('lb-list').textContent = '—'; }
+}
+function renderLeaderboard(top) {
+  const list = document.getElementById('lb-list');
+  if (!list) return;
+  if (!top.length) { list.textContent = t('lb_empty'); return; }
+  const myId = (TG && TG.initDataUnsafe && TG.initDataUnsafe.user && TG.initDataUnsafe.user.id) || null;
+  list.innerHTML = top.slice(0, 50).map((e, i) =>
+    '<div class="lb-row' + (myId && e.uid === myId ? ' me' : '') + '">' +
+      '<div class="rank">' + (i + 1) + '</div>' +
+      '<div class="name">' + escapeHtml(e.name) + (myId && e.uid === myId ? ' (' + t('you_label') + ')' : '') + '</div>' +
+      '<div class="score">' + fmtNum(e.score) + ' 💰</div>' +
+    '</div>'
+  ).join('');
+}
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+
+/* Toast */
+let toastTimer = 0;
+function toast(msg) {
+  let el = document.getElementById('toast-el');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'toast-el';
+    el.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);' +
+      'top:calc(var(--tg-safe-top) + 60px);background:rgba(20,12,38,0.95);color:#fff;padding:10px 18px;' +
+      'border-radius:999px;font-size:13px;border:1px solid rgba(255,216,100,0.4);' +
+      'box-shadow:0 4px 12px rgba(0,0,0,0.4);z-index:200;pointer-events:none;' +
+      'opacity:0;transition:opacity 200ms';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.opacity = '1';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.style.opacity = '0'; }, 1800);
+}
+
+/* =========================================================
+   [23] Boosters
+   ========================================================= */
+
+function setBoosterArmed(kind, on) {
+  const id = kind === 'double' ? 'bst-double' : (kind === 'wild' ? 'bst-wild' : 'bst-bag');
+  document.getElementById(id).classList.toggle('armed', !!on);
+}
+
+document.getElementById('bst-double').addEventListener('click', () => {
+  if (state.betBoosterTokens <= 0) { toast('No ⚡ tokens — buy in shop'); haptic('err'); return; }
+  if (game.doubleBetArmed) { toast('Already 2×'); return; }
+  state.betBoosterTokens--;
+  game.doubleBetArmed = true;
+  setBoosterArmed('double', true);
+  refreshAllUI();
+  haptic('med');
+  toast('2× bet armed — next match doubles');
+});
+
+document.getElementById('bst-wild').addEventListener('click', () => {
+  if (game.busy) return;
+  if (state.wildBoosterTokens <= 0) { toast('No 🎰 tokens — buy in shop'); haptic('err'); return; }
+  game.wildPending = true;
+  setBoosterArmed('wild', true);
+  toast('Tap a tile then swap to place wild');
+});
+
+document.getElementById('bst-bag').addEventListener('click', () => {
+  if (game.busy) return;
+  if (state.bagBoosterTokens <= 0) { toast('No 💰 tokens — buy in shop'); haptic('err'); return; }
+  state.bagBoosterTokens--;
+  let placed = 0, tries = 0;
+  while (placed < 3 && tries < 30) {
+    tries++;
+    const r = Math.floor(Math.random() * BOARD_ROWS);
+    const c = Math.floor(Math.random() * BOARD_COLS);
+    if (board[r][c] !== TILE.MONEY_BAG) { board[r][c] = TILE.MONEY_BAG; placed++; }
+  }
+  renderBoard();
+  refreshAllUI();
+  haptic('success');
+  toast('+3 💰 placed on board');
+});
+
+/* =========================================================
+   [24] Wire-up — gear buttons
+   ========================================================= */
+
+document.getElementById('btn-daily').addEventListener('click', showDailyModal);
+document.getElementById('btn-shop').addEventListener('click', showShopModal);
+document.getElementById('btn-settings').addEventListener('click', showSettingsModal);
+document.getElementById('btn-leaderboard').addEventListener('click', showLeaderboardModal);
+
+/* =========================================================
+   [25] Boot
+   ========================================================= */
+
+(async function boot() {
+  tgReady();
+  applyI18n();
+  spawnFreshBoard();
+  resizeBoardCanvas();
+  refreshAllUI();
+  refreshPrizeSubTier();
+
+  // First-launch welcome.
+  if (!state.welcomed) {
+    setTimeout(showWelcomeModal, 350);
+  } else if (canClaimDaily()) {
+    setTimeout(showDailyModal, 500);
+  }
+
+  await fetchServerFlags();
+  await serverStateLoad();
+  refreshAllUI();
+  setInterval(pollPurchases, 5000);
+  if (TG && TG.initData) {
+    fetch('/api/heartbeat', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: TG.initData, lang: state.lang, streak: state.streak }),
+    }).catch(() => {});
+  }
+})();
+
+</script>
+</body>
+</html>

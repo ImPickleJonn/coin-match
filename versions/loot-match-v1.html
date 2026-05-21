@@ -1,0 +1,2531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+<meta name="theme-color" content="#1a0e2a" />
+<title>Loot Match · Match3 Treasure Hunt</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  /* =========================================================
+     [01] Palette, root variables, layout primitives
+     ========================================================= */
+  :root {
+    --bg-top:        #2c1654;
+    --bg-mid:        #1a0e2a;
+    --bg-bottom:     #0c0518;
+    --gold:          #ffc94a;
+    --gold-deep:     #c9921a;
+    --gold-glow:     #ffe98a;
+    --silver:        #d8e1ee;
+    --copper:        #d68749;
+    --gem-red:       #e84a5f;
+    --gem-blue:      #4a8de8;
+    --gem-green:     #4ad88a;
+    --gem-purple:    #a263e8;
+    --ink:           #1a0e2a;
+    --paper:         #fdf6e2;
+    --pill:          rgba(255, 255, 255, 0.12);
+    --pill-strong:   rgba(255, 255, 255, 0.22);
+    --pill-gold:     rgba(255, 201, 74, 0.22);
+    --danger:        #ff5c7a;
+    --ok:            #4ad88a;
+    --tg-safe-top:   0px;
+    --tg-safe-bottom: 0px;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    height: 100%; width: 100%;
+    overflow: hidden; overscroll-behavior: none;
+    user-select: none; -webkit-user-select: none;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+    color: #fff;
+    background:
+      radial-gradient(ellipse at top, #3a1d6a 0%, #1a0e2a 55%, #0c0518 100%);
+    -webkit-touch-callout: none;
+  }
+  body { position: fixed; inset: 0; }
+
+  #app {
+    position: absolute; inset: 0;
+    padding-top: var(--tg-safe-top);
+    padding-bottom: var(--tg-safe-bottom);
+  }
+
+  .screen { position: absolute; inset: 0; display: none; }
+  .screen.active { display: block; }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    gap: 8px;
+    background: linear-gradient(180deg, #ffe28a 0%, #ffc94a 50%, #c9921a 100%);
+    color: #2a1a04;
+    border: 2px solid #ffe98a;
+    border-radius: 14px;
+    padding: 12px 24px;
+    font-size: 18px; font-weight: 800;
+    letter-spacing: 0.5px;
+    box-shadow: 0 6px 0 #6f4d05, 0 10px 18px rgba(0,0,0,0.35);
+    cursor: pointer;
+    text-transform: uppercase;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.4);
+  }
+  .btn:active { transform: translateY(3px); box-shadow: 0 3px 0 #6f4d05, 0 6px 10px rgba(0,0,0,0.35); }
+  .btn.ghost {
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.18);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    text-shadow: none;
+  }
+  .btn.ghost:active { transform: scale(0.96); box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+  .btn.small { padding: 8px 14px; font-size: 13px; border-radius: 10px; }
+  .btn.full { width: 100%; }
+
+  /* =========================================================
+     [02] Top HUD — coins, energy, gear
+     ========================================================= */
+  .topbar {
+    position: absolute; top: calc(var(--tg-safe-top) + 8px);
+    left: 8px; right: 8px;
+    display: flex; align-items: center; justify-content: space-between;
+    z-index: 30;
+  }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--pill); color: #fff;
+    border-radius: 999px; padding: 7px 13px;
+    font-weight: 800; font-size: 14px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.16);
+  }
+  .pill.gold {
+    background: linear-gradient(180deg, rgba(255,201,74,0.32), rgba(201,146,26,0.28));
+    border-color: rgba(255,232,138,0.5);
+    color: #fff8d8;
+  }
+  .pill.energy {
+    background: linear-gradient(180deg, rgba(74,141,232,0.32), rgba(40,90,180,0.28));
+    border-color: rgba(140,180,255,0.5);
+    color: #e0eaff;
+  }
+  .pill .em { font-size: 16px; line-height: 1; }
+  .pill .num { font-variant-numeric: tabular-nums; }
+  .topbar .left, .topbar .right { display: flex; gap: 6px; }
+
+  .gear {
+    width: 36px; height: 36px;
+    background: var(--pill); color: #fff;
+    border-radius: 50%; border: 1px solid rgba(255,255,255,0.18);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 18px; cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  }
+  .gear:active { transform: scale(0.94); }
+
+  /* =========================================================
+     [03] Title screen
+     ========================================================= */
+  #screen-title { z-index: 5; }
+  .title-wrap {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 32px 24px;
+  }
+  .logo {
+    font-size: 64px; font-weight: 900;
+    text-align: center; line-height: 1.05;
+    background: linear-gradient(180deg, #ffe98a 0%, #ffc94a 45%, #c9921a 100%);
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 4px 12px rgba(255, 201, 74, 0.45));
+    letter-spacing: -1px;
+    text-shadow: none;
+    margin-bottom: 4px;
+  }
+  .tagline {
+    font-size: 14px; opacity: 0.7;
+    text-align: center;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 36px;
+  }
+  .title-vault {
+    width: 220px; height: 220px;
+    margin-bottom: 36px;
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .title-vault canvas { display: block; }
+  .title-actions {
+    display: flex; flex-direction: column; gap: 14px;
+    width: 100%; max-width: 320px;
+  }
+  .title-foot {
+    position: absolute; bottom: calc(var(--tg-safe-bottom) + 12px);
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 11px; opacity: 0.45;
+    letter-spacing: 1px;
+  }
+
+  /* =========================================================
+     [04] Bet screen
+     ========================================================= */
+  .panel {
+    position: absolute;
+    left: 16px; right: 16px;
+    background: rgba(20, 12, 38, 0.85);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 22px;
+    padding: 20px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+    backdrop-filter: blur(6px);
+  }
+  .panel-title {
+    font-size: 16px; font-weight: 800; letter-spacing: 1.5px;
+    text-transform: uppercase; opacity: 0.85;
+    margin-bottom: 4px;
+  }
+  .panel-sub { font-size: 13px; opacity: 0.6; margin-bottom: 16px; }
+
+  .bet-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .bet-card {
+    background: rgba(255,255,255,0.06);
+    border: 2px solid rgba(255,255,255,0.14);
+    border-radius: 14px;
+    padding: 10px 6px;
+    text-align: center;
+    cursor: pointer;
+    transition: transform 80ms ease;
+    position: relative;
+  }
+  .bet-card.selected {
+    background: linear-gradient(180deg, rgba(255,201,74,0.25), rgba(201,146,26,0.18));
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(255,201,74,0.25), 0 4px 12px rgba(255,201,74,0.3);
+  }
+  .bet-card.locked { opacity: 0.35; cursor: not-allowed; }
+  .bet-card .amt {
+    font-size: 18px; font-weight: 800; line-height: 1.1;
+    color: var(--gold);
+  }
+  .bet-card .lbl {
+    font-size: 9px; letter-spacing: 1px; opacity: 0.7;
+    text-transform: uppercase; margin-top: 2px;
+  }
+  .bet-card .lock {
+    position: absolute; top: 4px; right: 6px; font-size: 11px; opacity: 0.6;
+  }
+
+  .ev-line {
+    display: flex; justify-content: space-between;
+    font-size: 13px; opacity: 0.75;
+    padding: 6px 4px;
+  }
+  .ev-line .v { font-weight: 700; color: var(--gold); }
+
+  /* =========================================================
+     [05] Game screen — board canvas
+     ========================================================= */
+  #screen-game .topbar { z-index: 32; }
+  .game-header {
+    position: absolute;
+    top: calc(var(--tg-safe-top) + 56px);
+    left: 16px; right: 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    z-index: 20;
+  }
+  .moves-pill {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.18);
+    color: #fff;
+    border-radius: 14px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .moves-pill .num {
+    font-size: 18px; color: var(--gold);
+    font-variant-numeric: tabular-nums;
+  }
+  .moves-pill.low .num { color: var(--danger); }
+
+  .round-coins {
+    text-align: right;
+  }
+  .round-coins .lbl {
+    font-size: 9px; letter-spacing: 1.5px; opacity: 0.6;
+    text-transform: uppercase;
+  }
+  .round-coins .num {
+    font-size: 22px; font-weight: 800;
+    background: linear-gradient(180deg, #fff 0%, #ffc94a 100%);
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Cascade meter */
+  .cascade-meter {
+    position: absolute;
+    top: calc(var(--tg-safe-top) + 104px);
+    left: 16px; right: 16px;
+    z-index: 18;
+    text-align: center;
+    pointer-events: none;
+  }
+  .cascade-meter .mult {
+    display: inline-block;
+    font-size: 14px; font-weight: 800;
+    color: var(--gold);
+    opacity: 0; transform: translateY(8px) scale(0.9);
+    transition: all 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    background: rgba(20,12,38,0.7);
+    border: 1px solid rgba(255,201,74,0.4);
+    padding: 4px 12px; border-radius: 999px;
+    text-shadow: 0 0 12px rgba(255,201,74,0.6);
+  }
+  .cascade-meter.show .mult { opacity: 1; transform: translateY(0) scale(1); }
+  .cascade-meter.mega .mult {
+    color: #fff;
+    background: linear-gradient(90deg, #ffc94a, #ff5c7a, #a263e8, #ffc94a);
+    background-size: 300% 100%;
+    animation: meterShift 1.5s linear infinite;
+    border-color: #fff;
+    font-size: 18px;
+    padding: 6px 18px;
+  }
+  @keyframes meterShift {
+    from { background-position: 0% 0; }
+    to   { background-position: 100% 0; }
+  }
+
+  #canvas-wrap {
+    position: absolute;
+    top: calc(var(--tg-safe-top) + 140px);
+    bottom: calc(var(--tg-safe-bottom) + 90px);
+    left: 0; right: 0;
+    display: flex; justify-content: center; align-items: center;
+  }
+  #board {
+    display: block;
+    background: transparent;
+    touch-action: none;
+    border-radius: 16px;
+  }
+
+  .game-foot {
+    position: absolute;
+    bottom: calc(var(--tg-safe-bottom) + 12px);
+    left: 16px; right: 16px;
+    z-index: 22;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px;
+  }
+  .booster-row { display: flex; gap: 8px; }
+  .booster-btn {
+    width: 56px; height: 56px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+    cursor: pointer;
+    position: relative;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.3), 0 6px 12px rgba(0,0,0,0.35);
+  }
+  .booster-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,0.3); }
+  .booster-btn.armed {
+    background: linear-gradient(180deg, rgba(255,201,74,0.4), rgba(201,146,26,0.3));
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(255,201,74,0.25), 0 4px 0 rgba(0,0,0,0.3);
+  }
+  .booster-btn .count {
+    position: absolute; top: -6px; right: -6px;
+    background: var(--gold);
+    color: #2a1a04;
+    font-size: 10px; font-weight: 800;
+    padding: 2px 6px; border-radius: 999px;
+    min-width: 18px; text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+  }
+  .booster-btn.empty { opacity: 0.55; }
+  .booster-btn.empty .count { background: rgba(255,255,255,0.3); color: #fff; }
+
+  /* =========================================================
+     [06] Vault progress bar (always-visible meta)
+     ========================================================= */
+  .vault-bar {
+    position: absolute;
+    top: calc(var(--tg-safe-top) + 50px);
+    left: 16px; right: 16px;
+    z-index: 19;
+    display: none;   /* hidden under game-header on game screen; only shown on title */
+  }
+  .vault-bar.title-mode {
+    top: auto; bottom: 24px;
+    display: block;
+    text-align: center;
+  }
+  .vault-name {
+    font-size: 12px; letter-spacing: 1.5px;
+    color: var(--gold); opacity: 0.85;
+    text-transform: uppercase; font-weight: 800;
+    margin-bottom: 4px;
+  }
+  .vault-track {
+    height: 8px; background: rgba(255,255,255,0.1);
+    border-radius: 999px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.12);
+  }
+  .vault-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--gold-deep), var(--gold), var(--gold-glow));
+    width: 0%;
+    transition: width 400ms cubic-bezier(0.4, 0.0, 0.2, 1);
+    box-shadow: 0 0 8px rgba(255,201,74,0.6);
+  }
+
+  /* =========================================================
+     [07] Modal — generic
+     ========================================================= */
+  .modal-back {
+    position: absolute; inset: 0;
+    background: rgba(8, 4, 18, 0.7);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+    display: none;
+    align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .modal-back.show { display: flex; }
+  .modal {
+    background: linear-gradient(180deg, #2c1654 0%, #1a0e2a 100%);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 22px;
+    padding: 24px;
+    max-width: 360px; width: 100%;
+    max-height: 86vh;
+    overflow-y: auto;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.6);
+  }
+  .modal h2 {
+    margin: 0 0 8px 0;
+    font-size: 22px; font-weight: 800;
+    color: var(--gold);
+    text-align: center;
+  }
+  .modal .sub {
+    text-align: center;
+    font-size: 13px; opacity: 0.7;
+    margin-bottom: 16px;
+  }
+  .modal .row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .modal .row:last-child { border-bottom: none; }
+  .modal .actions {
+    display: flex; flex-direction: column; gap: 10px;
+    margin-top: 16px;
+  }
+  .modal-close {
+    position: absolute; top: 8px; right: 8px;
+    width: 32px; height: 32px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 18px; cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+  .modal { position: relative; }
+
+  /* End-of-round summary */
+  .summary-amt {
+    text-align: center;
+    margin: 12px 0 18px 0;
+  }
+  .summary-amt .v {
+    font-size: 56px; font-weight: 900; line-height: 1;
+    background: linear-gradient(180deg, #fff 0%, #ffc94a 100%);
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+    font-variant-numeric: tabular-nums;
+    filter: drop-shadow(0 4px 12px rgba(255,201,74,0.4));
+  }
+  .summary-amt .l {
+    font-size: 11px; letter-spacing: 2px; opacity: 0.6;
+    text-transform: uppercase;
+  }
+  .summary-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+  .summary-stats .cell {
+    background: rgba(255,255,255,0.05);
+    border-radius: 10px;
+    padding: 8px 6px;
+    text-align: center;
+  }
+  .summary-stats .cell .n {
+    font-size: 16px; font-weight: 800; color: var(--gold);
+  }
+  .summary-stats .cell .k {
+    font-size: 9px; letter-spacing: 1px; opacity: 0.7;
+    text-transform: uppercase;
+  }
+
+  /* Shop */
+  .shop-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 14px;
+    margin-bottom: 8px;
+    cursor: pointer;
+  }
+  .shop-item:active { transform: scale(0.98); }
+  .shop-item.featured {
+    border-color: var(--gold);
+    background: linear-gradient(180deg, rgba(255,201,74,0.15), rgba(255,201,74,0.05));
+    box-shadow: 0 4px 12px rgba(255,201,74,0.15);
+  }
+  .shop-item .ico { font-size: 30px; min-width: 40px; text-align: center; }
+  .shop-item .info { flex: 1; min-width: 0; }
+  .shop-item .title { font-size: 14px; font-weight: 700; }
+  .shop-item .desc { font-size: 11px; opacity: 0.65; margin-top: 2px; line-height: 1.3; }
+  .shop-item .price {
+    background: var(--gold);
+    color: #2a1a04;
+    padding: 6px 10px; border-radius: 10px;
+    font-size: 13px; font-weight: 800;
+    white-space: nowrap;
+  }
+
+  /* Daily chest */
+  .chest-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    margin: 12px 0;
+  }
+  .chest-day {
+    aspect-ratio: 1;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    font-size: 9px;
+    position: relative;
+  }
+  .chest-day .em { font-size: 20px; }
+  .chest-day .amt { font-size: 9px; color: var(--gold); font-weight: 700; }
+  .chest-day .d { position: absolute; top: 2px; left: 4px; opacity: 0.5; font-size: 8px; }
+  .chest-day.claimed { opacity: 0.35; }
+  .chest-day.today {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 2px rgba(255,201,74,0.3);
+    background: linear-gradient(180deg, rgba(255,201,74,0.2), rgba(255,201,74,0.05));
+  }
+  .chest-day.future { opacity: 0.5; }
+
+  /* Tier-up celebration */
+  .tier-up {
+    text-align: center;
+  }
+  .tier-up .big {
+    font-size: 80px;
+    margin: 12px 0;
+    filter: drop-shadow(0 8px 20px rgba(255,201,74,0.5));
+  }
+  .tier-up .new-name {
+    font-size: 28px; font-weight: 900;
+    color: var(--gold);
+    margin-bottom: 4px;
+  }
+
+  /* Lang picker */
+  .lang-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    margin: 8px 0;
+  }
+  .lang-cell {
+    padding: 10px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    font-size: 13px;
+    text-align: center;
+    cursor: pointer;
+  }
+  .lang-cell.active {
+    border-color: var(--gold);
+    background: rgba(255,201,74,0.15);
+  }
+  .lang-cell .flag { font-size: 18px; margin-right: 6px; }
+
+  /* Leaderboard */
+  .lb-tabs {
+    display: flex; gap: 4px; margin-bottom: 12px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 12px;
+    padding: 4px;
+  }
+  .lb-tab {
+    flex: 1; padding: 8px;
+    text-align: center;
+    font-size: 12px; font-weight: 700;
+    letter-spacing: 1px; text-transform: uppercase;
+    border-radius: 8px;
+    cursor: pointer;
+    opacity: 0.6;
+  }
+  .lb-tab.active {
+    background: var(--gold);
+    color: #2a1a04;
+    opacity: 1;
+  }
+  .lb-list { max-height: 50vh; overflow-y: auto; }
+  .lb-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 4px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 13px;
+  }
+  .lb-row.me { background: rgba(255,201,74,0.08); border-radius: 8px; padding-left: 8px; }
+  .lb-row .rank {
+    width: 28px; text-align: center;
+    font-weight: 800; color: var(--gold);
+    font-variant-numeric: tabular-nums;
+  }
+  .lb-row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lb-row .score { color: var(--gold); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  /* Floating coin text on board */
+  .float-coin {
+    position: absolute;
+    pointer-events: none;
+    font-weight: 800;
+    color: var(--gold);
+    text-shadow: 0 2px 6px rgba(0,0,0,0.6), 0 0 8px rgba(255,201,74,0.5);
+    font-size: 18px;
+    z-index: 40;
+    transition: transform 800ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 800ms;
+  }
+
+  /* Tiny utility */
+  .center { text-align: center; }
+  .mt-4 { margin-top: 4px; }
+  .mt-8 { margin-top: 8px; }
+  .mt-12 { margin-top: 12px; }
+  .mt-16 { margin-top: 16px; }
+  .opacity-60 { opacity: 0.6; }
+  .opacity-80 { opacity: 0.8; }
+  .gold-text { color: var(--gold); font-weight: 800; }
+
+  /* Mega cascade splash */
+  .mega-splash {
+    position: absolute; inset: 0;
+    z-index: 50;
+    display: none;
+    align-items: center; justify-content: center;
+    pointer-events: none;
+  }
+  .mega-splash.show { display: flex; }
+  .mega-splash .txt {
+    font-size: 56px; font-weight: 900;
+    background: linear-gradient(90deg, #ffc94a, #ff5c7a, #a263e8, #4a8de8, #ffc94a);
+    background-size: 200% 100%;
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+    animation: megaPulse 600ms ease-out, meterShift 1.5s linear infinite 600ms;
+    filter: drop-shadow(0 8px 20px rgba(255,201,74,0.6));
+    text-align: center;
+    letter-spacing: 2px;
+  }
+  @keyframes megaPulse {
+    0%   { opacity: 0; transform: scale(0.5); }
+    50%  { opacity: 1; transform: scale(1.15); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+
+  /* No-IAP fallback note */
+  .no-iap-note {
+    font-size: 11px; opacity: 0.5; text-align: center;
+    margin-top: 8px; padding: 6px; background: rgba(255,255,255,0.04);
+    border-radius: 8px;
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ============ TITLE SCREEN ============ -->
+  <div id="screen-title" class="screen active">
+    <div class="topbar">
+      <div class="left">
+        <div class="pill gold"><span class="em">💰</span><span class="num" id="title-coins">0</span></div>
+        <div class="pill energy"><span class="em">⚡</span><span class="num"><span id="title-energy">5</span>/<span id="title-energy-max">5</span></span></div>
+      </div>
+      <div class="right">
+        <div class="gear" id="btn-leaderboard" title="Leaderboard">🏆</div>
+        <div class="gear" id="btn-daily" title="Daily Chest">🎁</div>
+        <div class="gear" id="btn-shop" title="Shop">💎</div>
+        <div class="gear" id="btn-settings" title="Settings">⚙️</div>
+      </div>
+    </div>
+    <div class="title-wrap">
+      <div class="logo">LOOT<br/>MATCH</div>
+      <div class="tagline" data-i18n="tagline">Match · Bet · Cascade</div>
+      <div class="title-vault"><canvas id="title-vault-canvas" width="220" height="220"></canvas></div>
+      <div class="title-actions">
+        <button class="btn full" id="btn-play" data-i18n="play_button">Play</button>
+        <div id="energy-countdown" style="text-align:center;font-size:12px;opacity:0.6;height:14px;"></div>
+      </div>
+    </div>
+    <div class="vault-bar title-mode">
+      <div class="vault-name" id="title-vault-name">Wooden Chest · Tier 1</div>
+      <div class="vault-track"><div class="vault-fill" id="title-vault-fill"></div></div>
+    </div>
+    <div class="title-foot">v0.1.0 · No ads, Stars-only IAP</div>
+  </div>
+
+  <!-- ============ BET SCREEN ============ -->
+  <div id="screen-bet" class="screen">
+    <div class="topbar">
+      <div class="left">
+        <div class="pill gold"><span class="em">💰</span><span class="num" id="bet-coins">0</span></div>
+        <div class="pill energy"><span class="em">⚡</span><span class="num"><span id="bet-energy">5</span>/<span id="bet-energy-max">5</span></span></div>
+      </div>
+      <div class="right">
+        <div class="gear" id="bet-back" title="Back">←</div>
+      </div>
+    </div>
+    <div class="panel" style="top: calc(var(--tg-safe-top) + 60px);">
+      <div class="panel-title" data-i18n="choose_bet">Choose Your Bet</div>
+      <div class="panel-sub" data-i18n="bet_explain">Higher bet = more coins per match. Cascades multiply your reward.</div>
+      <div class="bet-grid" id="bet-grid"></div>
+      <div class="ev-line"><span data-i18n="bet_label">Bet</span><span class="v" id="ev-bet">1</span></div>
+      <div class="ev-line"><span data-i18n="avg_pot">Avg payout</span><span class="v" id="ev-avg">~150</span></div>
+      <div class="ev-line"><span data-i18n="max_cascade_pot">If you go MEGA</span><span class="v" id="ev-max">~3,500</span></div>
+      <button class="btn full mt-12" id="btn-start-round" data-i18n="start_round">Start Round</button>
+      <div class="no-iap-note mt-8" id="bet-iap-note" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- ============ GAME SCREEN ============ -->
+  <div id="screen-game" class="screen">
+    <div class="topbar">
+      <div class="left">
+        <div class="pill gold"><span class="em">💰</span><span class="num" id="game-coins">0</span></div>
+      </div>
+      <div class="right">
+        <div class="gear" id="btn-pause" title="Pause">II</div>
+      </div>
+    </div>
+
+    <div class="game-header">
+      <div class="moves-pill" id="moves-pill">
+        <span data-i18n="moves_short">Moves</span>
+        <span class="num" id="moves-num">10</span>
+      </div>
+      <div class="round-coins">
+        <div class="lbl" data-i18n="round_label">This round</div>
+        <div class="num" id="round-num">0</div>
+      </div>
+    </div>
+
+    <div class="cascade-meter" id="cascade-meter">
+      <span class="mult" id="cascade-mult">CASCADE x2</span>
+    </div>
+
+    <div id="canvas-wrap">
+      <canvas id="board" width="360" height="360"></canvas>
+    </div>
+
+    <div class="mega-splash" id="mega-splash"><div class="txt" id="mega-text">MEGA<br/>CASCADE!</div></div>
+
+    <div class="game-foot">
+      <div class="booster-row">
+        <div class="booster-btn" id="bst-bet">⚡<div class="count" id="cnt-bet">0</div></div>
+        <div class="booster-btn" id="bst-wild">🎰<div class="count" id="cnt-wild">0</div></div>
+        <div class="booster-btn" id="bst-bag">💰<div class="count" id="cnt-bag">0</div></div>
+      </div>
+      <button class="btn small ghost" id="btn-give-up" data-i18n="give_up">End Round</button>
+    </div>
+  </div>
+
+  <!-- ============ MODALS ============ -->
+  <div class="modal-back" id="modal-back">
+    <div class="modal" id="modal"></div>
+  </div>
+
+</div>
+
+<script>
+/* =========================================================
+   [10] Constants — board, scoring, vault tiers
+   ========================================================= */
+
+const VERSION = 'v0.1.0';
+
+// Match3 board geometry
+const BOARD_COLS = 8;
+const BOARD_ROWS = 8;
+const NUM_COLORS = 6;         // 6 tile colors → matches Match Icon convention
+const STARTING_MOVES = 10;
+const MIN_MATCH = 3;
+
+// Tile metadata. Index 0..5 are regular colored tiles; 6 = Money Bag,
+// 7 = Wild, 8 = Event (DC), 9 = GAE. Specials never spawn except via the
+// special-spawn pipeline, so the random board generator only produces 0..5.
+const TILE = {
+  COIN_COPPER: 0,   // 🪙
+  COIN_SILVER: 1,   // 🥈
+  COIN_GOLD:   2,   // 🥇
+  GEM_RED:     3,   // 💎
+  RING:        4,   // 💍
+  CROWN:       5,   // 👑
+  MONEY_BAG:   6,   // 💰  (3x cell value)
+  WILD:        7,   // 🎰  (matches any color)
+  EVENT_DC:    8,   // ⭐  (Dynamic Currency — collect for event reward)
+  GAE:         9,   // 🎁  (General Accumulation Event token)
+};
+
+// Per-tile base value (multiplied by bet × cascade). Higher-rarity colors
+// pay more, which gives players a soft preference for matching crowns over
+// copper coins.
+const TILE_VALUE = {
+  [TILE.COIN_COPPER]: 1,
+  [TILE.COIN_SILVER]: 1.2,
+  [TILE.COIN_GOLD]:   1.5,
+  [TILE.GEM_RED]:     1.8,
+  [TILE.RING]:        2.0,
+  [TILE.CROWN]:       2.5,
+  [TILE.MONEY_BAG]:   5.0,
+  [TILE.WILD]:        1.0,
+  [TILE.EVENT_DC]:    1.0,
+  [TILE.GAE]:         1.0,
+};
+
+// Emoji map — used both on canvas and in HTML buttons. Kept as plain
+// emoji for v0.1; a sprite atlas can replace this later without changing
+// gameplay logic.
+const TILE_EMOJI = {
+  [TILE.COIN_COPPER]: '🪙',
+  [TILE.COIN_SILVER]: '🥈',
+  [TILE.COIN_GOLD]:   '🥇',
+  [TILE.GEM_RED]:     '💎',
+  [TILE.RING]:        '💍',
+  [TILE.CROWN]:       '👑',
+  [TILE.MONEY_BAG]:   '💰',
+  [TILE.WILD]:        '🎰',
+  [TILE.EVENT_DC]:    '⭐',
+  [TILE.GAE]:         '🎁',
+};
+
+// Background color for each tile cell — pure color blocks under the emoji.
+// Subtle so the emoji stays readable on tiny phones.
+const TILE_BG = {
+  [TILE.COIN_COPPER]: '#d68749',
+  [TILE.COIN_SILVER]: '#a8b3c4',
+  [TILE.COIN_GOLD]:   '#ffc94a',
+  [TILE.GEM_RED]:     '#e84a5f',
+  [TILE.RING]:        '#a263e8',
+  [TILE.CROWN]:       '#4ad88a',
+  [TILE.MONEY_BAG]:   '#ffd86b',
+  [TILE.WILD]:        '#ffffff',
+  [TILE.EVENT_DC]:    '#fff0a0',
+  [TILE.GAE]:         '#ffafd0',
+};
+
+// Cascade multiplier per chain step. The values curve up sharply at depth
+// 4+ to make MEGA cascades genuinely memorable. Designed so a 6-step
+// cascade at bet 100 with a couple of money bags can hit 50k+ coins —
+// big enough to feel like a slot jackpot.
+const CASCADE_MULT = [1, 1, 1.5, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0];
+
+// Money-bag spawn probability on each replenished tile. ~3% means players
+// see one per round on average without it becoming routine.
+const MONEY_BAG_SPAWN_P = 0.03;
+// Wild ~1%.
+const WILD_SPAWN_P = 0.01;
+// Event-tile spawn probability (only when server flag enabled).
+const EVENT_TILE_SPAWN_P = 0.04;
+
+// Vault tiers. Each tier requires totalLifetimeCoins ≥ threshold to be
+// "current tier". Vault name + emoji change visibly as you climb.
+const VAULT_TIERS = [
+  { name: 'Wooden Chest',   emoji: '📦', threshold: 0,        color: '#a06138' },
+  { name: 'Iron Chest',     emoji: '🗃️', threshold: 1000,     color: '#8c8c8c' },
+  { name: 'Bronze Vault',   emoji: '⚱️', threshold: 5000,     color: '#cd7f32' },
+  { name: 'Silver Vault',   emoji: '🏺', threshold: 25000,    color: '#c0c0c0' },
+  { name: 'Gold Vault',     emoji: '💰', threshold: 100000,   color: '#ffc94a' },
+  { name: 'Diamond Vault',  emoji: '💎', threshold: 500000,   color: '#7fdbff' },
+  { name: 'Royal Treasury', emoji: '👑', threshold: 2000000,  color: '#a263e8' },
+  { name: "Dragon's Hoard", emoji: '🐉', threshold: 10000000, color: '#e84a5f' },
+];
+
+// Bet ladder. Each step unlocks at a vault tier — so beginners can't bet
+// 500 and lose their starter pile.
+const BETS = [
+  { value: 1,    unlockTier: 0, label: '1' },
+  { value: 5,    unlockTier: 0, label: '5' },
+  { value: 25,   unlockTier: 1, label: '25' },
+  { value: 100,  unlockTier: 2, label: '100' },
+  { value: 500,  unlockTier: 3, label: '500' },
+  { value: 2500, unlockTier: 5, label: '2.5K' },
+];
+
+// Daily login chest — coin amounts by day in a 7-day cycle. Day 7 is the
+// big push, both because it rewards consistency and because most coin-
+// game UX research says day-7 retention is the dominant inflection point.
+const DAILY_CHEST = [
+  { coins: 200,   energy: 0, em: '💰' },
+  { coins: 400,   energy: 1, em: '⚡' },
+  { coins: 700,   energy: 0, em: '💎' },
+  { coins: 1200,  energy: 2, em: '⚡' },
+  { coins: 2000,  energy: 0, em: '💍' },
+  { coins: 3500,  energy: 0, em: '👑' },
+  { coins: 8000,  energy: 5, em: '🎁' },   // day-7 jackpot
+];
+
+const STORAGE_KEY = 'loot-match-save-v1';
+
+/* =========================================================
+   [11] Save / load state
+   ========================================================= */
+
+const defaultState = () => ({
+  coins: 500,
+  gems: 0,
+  energy: 5,
+  energyMax: 5,
+  energyRegenAt: 0,      // ms timestamp when next +1 energy lands
+  vaultTier: 0,
+  vaultProgress: 0,       // coins in current tier
+  vaultLifetimeCoins: 0,  // sum of all coins earned ever (drives tier)
+  skins: ['default'],
+  activeSkin: 'default',
+  betBoosterTokens: 0,
+  wildBoosterTokens: 0,
+  bagBoosterTokens: 0,
+  streak: 0,
+  lastPlayedYMD: '',
+  totalCoinsEver: 0,
+  totalMatchesEver: 0,
+  totalCascadesEver: 0,
+  bestCascadeEver: 0,
+  bestRoundCoinsEver: 0,
+  dailyChestYMD: '',
+  dailyChestDay: 0,         // 0..7 (0 = nothing claimed yet this cycle)
+  eventTokens: 0,
+  gaeContributed: 0,
+  missions: {},
+  achievements: {},
+  battlePassUntil: 0,
+  firstSeenAt: Date.now(),
+  welcomed: false,
+  lang: 'en',
+  preferredBetIdx: 1,
+});
+
+let state = loadState();
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return defaultState();
+    const obj = JSON.parse(raw);
+    return Object.assign(defaultState(), obj);
+  } catch (e) { return defaultState(); }
+}
+function saveState() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+  serverSyncDebounced();
+}
+
+/* =========================================================
+   [12] i18n — EN + RU full, 18-lang stubs
+   ========================================================= */
+
+const LANGS = [
+  { code: 'en', name: 'English',    flag: '🇬🇧' },
+  { code: 'ru', name: 'Русский',    flag: '🇷🇺' },
+  { code: 'es', name: 'Español',    flag: '🇪🇸' },
+  { code: 'pt', name: 'Português',  flag: '🇵🇹' },
+  { code: 'de', name: 'Deutsch',    flag: '🇩🇪' },
+  { code: 'fr', name: 'Français',   flag: '🇫🇷' },
+  { code: 'it', name: 'Italiano',   flag: '🇮🇹' },
+  { code: 'tr', name: 'Türkçe',     flag: '🇹🇷' },
+  { code: 'pl', name: 'Polski',     flag: '🇵🇱' },
+  { code: 'nl', name: 'Nederlands', flag: '🇳🇱' },
+  { code: 'uk', name: 'Українська', flag: '🇺🇦' },
+  { code: 'ar', name: 'العربية',     flag: '🇸🇦' },
+  { code: 'hi', name: 'हिन्दी',        flag: '🇮🇳' },
+  { code: 'id', name: 'Indonesia',  flag: '🇮🇩' },
+  { code: 'vi', name: 'Tiếng Việt', flag: '🇻🇳' },
+  { code: 'th', name: 'ไทย',         flag: '🇹🇭' },
+  { code: 'ja', name: '日本語',       flag: '🇯🇵' },
+  { code: 'ko', name: '한국어',       flag: '🇰🇷' },
+  { code: 'zh', name: '中文',         flag: '🇨🇳' },
+  { code: 'fa', name: 'فارسی',       flag: '🇮🇷' },
+];
+
+const I18N = {
+  en: {
+    tagline: 'Match · Bet · Cascade',
+    play_button: 'Play',
+    choose_bet: 'Choose Your Bet',
+    bet_explain: 'Higher bet = more coins per match. Cascades multiply your reward.',
+    bet_label: 'Bet',
+    avg_pot: 'Avg payout',
+    max_cascade_pot: 'If you go MEGA',
+    start_round: 'Start Round',
+    moves_short: 'Moves',
+    round_label: 'This round',
+    give_up: 'End Round',
+    round_complete: 'Round Complete!',
+    coins_earned: 'Coins earned',
+    best_cascade: 'Best cascade',
+    matches_made: 'Matches',
+    bags_collected: 'Money bags',
+    play_again: 'Play Again',
+    back_to_title: 'Back to Title',
+    not_enough_energy: 'Not enough energy. Wait for refill or buy more.',
+    not_enough_coins: 'Not enough coins to place that bet.',
+    energy_full: 'Energy full',
+    next_energy_in: 'Next ⚡ in',
+    bet_locked: 'Unlocks at',
+    vault_tier_label: 'Vault Tier',
+    daily_chest: 'Daily Chest',
+    daily_today: 'Today',
+    daily_streak: 'Streak: {n} days',
+    claim: 'Claim',
+    already_claimed: 'Claimed',
+    come_back_tomorrow: 'Come back tomorrow!',
+    shop_title: 'Shop',
+    shop_subtitle: 'Stars only · No ads, ever',
+    settings_title: 'Settings',
+    language: 'Language',
+    sound: 'Sound',
+    haptics: 'Haptics',
+    leaderboard: 'Leaderboard',
+    lb_global: 'Global',
+    lb_today: 'Today',
+    lb_empty: 'Be the first on the board!',
+    you_label: 'You',
+    new_tier: 'NEW VAULT UNLOCKED!',
+    tier_reward: '+{n} bonus coins',
+    paused: 'Paused',
+    resume: 'Resume',
+    quit: 'Quit',
+    no_iap: 'IAP disabled in local dev. Deploy with BOT_TOKEN to enable.',
+    welcome_title: 'Welcome to Loot Match!',
+    welcome_body: 'Match 3+ tiles to win coins. Bet bigger, cascade harder, fill your vault. Good luck!',
+    lets_go: 'Let\'s Go!',
+    event_active: 'EVENT: Collect {emoji} tokens!',
+    event_tokens_label: 'Event tokens',
+    mega_cascade: 'MEGA CASCADE!',
+    cascade_x: 'CASCADE x{n}',
+    no_more_moves: 'No more matches possible. Reshuffling…',
+  },
+  ru: {
+    tagline: 'Матч · Ставка · Каскад',
+    play_button: 'Играть',
+    choose_bet: 'Выбери ставку',
+    bet_explain: 'Больше ставка — больше монет за матч. Каскады умножают награду.',
+    bet_label: 'Ставка',
+    avg_pot: 'Средний выигрыш',
+    max_cascade_pot: 'При МЕГА-каскаде',
+    start_round: 'Начать раунд',
+    moves_short: 'Ходы',
+    round_label: 'В раунде',
+    give_up: 'Завершить',
+    round_complete: 'Раунд завершён!',
+    coins_earned: 'Монет получено',
+    best_cascade: 'Лучший каскад',
+    matches_made: 'Матчи',
+    bags_collected: 'Мешки',
+    play_again: 'Ещё раунд',
+    back_to_title: 'На главную',
+    not_enough_energy: 'Не хватает энергии. Подожди или купи.',
+    not_enough_coins: 'Не хватает монет на эту ставку.',
+    energy_full: 'Энергия полная',
+    next_energy_in: 'Энергия через',
+    bet_locked: 'Откроется на',
+    vault_tier_label: 'Уровень хранилища',
+    daily_chest: 'Ежедневный сундук',
+    daily_today: 'Сегодня',
+    daily_streak: 'Серия: {n} дней',
+    claim: 'Забрать',
+    already_claimed: 'Забрано',
+    come_back_tomorrow: 'Возвращайся завтра!',
+    shop_title: 'Магазин',
+    shop_subtitle: 'Только Stars · Никакой рекламы',
+    settings_title: 'Настройки',
+    language: 'Язык',
+    sound: 'Звук',
+    haptics: 'Вибрация',
+    leaderboard: 'Таблица лидеров',
+    lb_global: 'Глобальная',
+    lb_today: 'Сегодня',
+    lb_empty: 'Будь первым в таблице!',
+    you_label: 'Ты',
+    new_tier: 'НОВОЕ ХРАНИЛИЩЕ!',
+    tier_reward: '+{n} бонусных монет',
+    paused: 'Пауза',
+    resume: 'Продолжить',
+    quit: 'Выйти',
+    no_iap: 'Покупки выключены в локальной разработке.',
+    welcome_title: 'Добро пожаловать в Loot Match!',
+    welcome_body: 'Собирай 3+ плитки в ряд, чтобы получить монеты. Ставь больше, делай каскады, заполняй хранилище!',
+    lets_go: 'Поехали!',
+    event_active: 'ИВЕНТ: собирай {emoji}!',
+    event_tokens_label: 'Жетоны ивента',
+    mega_cascade: 'МЕГА-КАСКАД!',
+    cascade_x: 'КАСКАД x{n}',
+    no_more_moves: 'Нет ходов. Перемешиваю…',
+  },
+};
+
+// Stub the other 18 languages to English text — easy to fill in later by
+// shipping per-language patches.
+for (const l of LANGS) if (!I18N[l.code]) I18N[l.code] = I18N.en;
+
+function t(key, vars) {
+  const dict = I18N[state.lang] || I18N.en;
+  let s = dict[key] || I18N.en[key] || key;
+  if (vars) for (const k of Object.keys(vars)) s = s.replace('{' + k + '}', vars[k]);
+  return s;
+}
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.getAttribute('data-i18n'));
+  });
+}
+
+/* =========================================================
+   [13] Telegram bridge
+   ========================================================= */
+
+const TG = window.Telegram && window.Telegram.WebApp;
+function tgReady() {
+  if (!TG) return;
+  try {
+    TG.ready();
+    TG.expand();
+    if (TG.requestFullscreen) try { TG.requestFullscreen(); } catch (e) {}
+    if (TG.disableVerticalSwipes) try { TG.disableVerticalSwipes(); } catch (e) {}
+    if (TG.lockOrientation) try { TG.lockOrientation(); } catch (e) {}
+    applySafeArea();
+    if (TG.onEvent) {
+      TG.onEvent('viewportChanged', applySafeArea);
+      TG.onEvent('safeAreaChanged', applySafeArea);
+      TG.onEvent('contentSafeAreaChanged', applySafeArea);
+    }
+    // Pick TG language as default if user hasn't set one yet.
+    if (state.lang === 'en' && TG.initDataUnsafe && TG.initDataUnsafe.user && TG.initDataUnsafe.user.language_code) {
+      const lc = String(TG.initDataUnsafe.user.language_code).slice(0, 2).toLowerCase();
+      if (I18N[lc]) state.lang = lc;
+    }
+  } catch (e) {}
+}
+
+function applySafeArea() {
+  if (!TG) return;
+  const csi = TG.contentSafeAreaInset || TG.safeAreaInset || {};
+  const top = Math.max(0, csi.top || 0);
+  const bottom = Math.max(0, csi.bottom || 0);
+  document.documentElement.style.setProperty('--tg-safe-top', top + 'px');
+  document.documentElement.style.setProperty('--tg-safe-bottom', bottom + 'px');
+  resizeBoardCanvas();
+}
+
+function haptic(kind) {
+  if (!TG || !TG.HapticFeedback) return;
+  try {
+    if (kind === 'tap') TG.HapticFeedback.impactOccurred('light');
+    else if (kind === 'med') TG.HapticFeedback.impactOccurred('medium');
+    else if (kind === 'heavy') TG.HapticFeedback.impactOccurred('heavy');
+    else if (kind === 'success') TG.HapticFeedback.notificationOccurred('success');
+    else if (kind === 'err') TG.HapticFeedback.notificationOccurred('error');
+  } catch (e) {}
+}
+
+/* =========================================================
+   [14] Server sync (debounced)
+   ========================================================= */
+
+let serverSyncTimer = 0;
+function serverSyncDebounced() {
+  if (!TG || !TG.initData) return;
+  clearTimeout(serverSyncTimer);
+  serverSyncTimer = setTimeout(serverSyncNow, 2500);
+}
+async function serverSyncNow() {
+  if (!TG || !TG.initData) return;
+  try {
+    const patch = {};
+    const SYNC_KEYS = ['coins','gems','energy','energyMax','energyRegenAt',
+      'vaultTier','vaultProgress','vaultLifetimeCoins',
+      'skins','activeSkin','betBoosterTokens','wildBoosterTokens','bagBoosterTokens',
+      'streak','lastPlayedYMD','totalCoinsEver','totalMatchesEver','totalCascadesEver',
+      'bestCascadeEver','bestRoundCoinsEver','dailyChestYMD','dailyChestDay',
+      'eventTokens','gaeContributed','missions','achievements','battlePassUntil',
+      'firstSeenAt','welcomed','lang'];
+    for (const k of SYNC_KEYS) patch[k] = state[k];
+    await fetch('/api/state/save', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: TG.initData, patch }),
+    });
+  } catch (e) {}
+}
+
+async function serverStateLoad() {
+  if (!TG || !TG.initData) return;
+  try {
+    const r = await fetch('/api/state/load', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: TG.initData }),
+    });
+    const d = await r.json();
+    if (d.exists && d.state) {
+      // Server is authoritative for coins/gems/vault — local may be stale
+      // if user played on a different device.
+      Object.assign(state, d.state);
+      saveState();
+      refreshAllUI();
+    }
+  } catch (e) {}
+}
+
+let IAP_ENABLED = false;
+let SKUS = [];
+let EVENTS = { dc: null, gae: null };
+async function fetchServerFlags() {
+  try {
+    const r = await fetch('/api/flags');
+    const d = await r.json();
+    IAP_ENABLED = !!d.iap;
+  } catch (e) { IAP_ENABLED = false; }
+  try {
+    const r = await fetch('/api/skus');
+    const d = await r.json();
+    SKUS = d.skus || [];
+  } catch (e) {}
+  try {
+    const r = await fetch('/api/events');
+    const d = await r.json();
+    EVENTS = d || {};
+  } catch (e) {}
+  refreshAllUI();
+}
+
+async function pollPurchases() {
+  if (!TG || !TG.initData) return;
+  try {
+    const r = await fetch('/api/poll-purchases', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: TG.initData }),
+    });
+    const d = await r.json();
+    if (d.purchases && d.purchases.length) {
+      for (const p of d.purchases) applyGrant(p.grant);
+      saveState();
+      refreshAllUI();
+      toast('Purchase received!');
+    }
+  } catch (e) {}
+}
+
+function applyGrant(g) {
+  if (!g) return;
+  if (g.coins) state.coins += g.coins;
+  if (g.gems)  state.gems  += g.gems;
+  if (g.energy) state.energy = Math.min(state.energyMax + g.energy, state.energy + g.energy);
+  if (g.energyMax) state.energyMax += g.energyMax;
+  if (g.skins) for (const s of g.skins) if (!state.skins.includes(s)) state.skins.push(s);
+  if (g.betBoosterTokens)  state.betBoosterTokens  += g.betBoosterTokens;
+  if (g.wildBoosterTokens) state.wildBoosterTokens += g.wildBoosterTokens;
+  if (g.bagBoosterTokens)  state.bagBoosterTokens  += g.bagBoosterTokens;
+  if (g.battlePass) state.battlePassUntil = Date.now() + g.battlePass * 24 * 60 * 60 * 1000;
+}
+
+async function buySku(sku) {
+  if (!IAP_ENABLED) { toast(t('no_iap')); return; }
+  if (!TG || !TG.initData) { toast(t('no_iap')); return; }
+  try {
+    const r = await fetch('/api/create-invoice', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: TG.initData, sku }),
+    });
+    const d = await r.json();
+    if (d.link && TG.openInvoice) {
+      TG.openInvoice(d.link, (status) => {
+        if (status === 'paid') {
+          // Server pushes the grant via /api/poll-purchases.
+          setTimeout(pollPurchases, 1200);
+          setTimeout(pollPurchases, 3500);
+        }
+      });
+    } else {
+      toast('Could not open invoice');
+    }
+  } catch (e) { toast('Purchase failed'); }
+}
+
+/* =========================================================
+   [15] Energy regen
+   ========================================================= */
+
+const ENERGY_REGEN_MS = 15 * 60 * 1000;
+
+function tickEnergy() {
+  // Refill 1 energy each ENERGY_REGEN_MS until we hit max. Drift-resistant:
+  // we store the wall-clock timestamp at which the next +1 should land.
+  if (state.energy >= state.energyMax) {
+    state.energyRegenAt = 0;
+    return;
+  }
+  const now = Date.now();
+  if (!state.energyRegenAt) state.energyRegenAt = now + ENERGY_REGEN_MS;
+  while (state.energyRegenAt && now >= state.energyRegenAt && state.energy < state.energyMax) {
+    state.energy++;
+    state.energyRegenAt += ENERGY_REGEN_MS;
+  }
+  if (state.energy >= state.energyMax) state.energyRegenAt = 0;
+}
+
+function energyCountdownStr() {
+  if (state.energy >= state.energyMax) return t('energy_full');
+  const ms = (state.energyRegenAt || 0) - Date.now();
+  if (ms <= 0) return '';
+  const m = Math.floor(ms / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  return t('next_energy_in') + ' ' + m + ':' + String(s).padStart(2, '0');
+}
+
+setInterval(() => {
+  const had = state.energy;
+  tickEnergy();
+  if (had !== state.energy) { saveState(); refreshAllUI(); }
+  // Always refresh the countdown text every second so the UI doesn't
+  // tick at the same rate as energy ticks.
+  refreshEnergyCountdown();
+}, 1000);
+
+/* =========================================================
+   [16] Match3 — core mechanics
+   ========================================================= */
+
+// Board is row-major: board[r][c] = tile index (TILE.*) or -1 for empty.
+let board = [];
+
+let game = {
+  active: false,
+  movesLeft: STARTING_MOVES,
+  betValue: 0,
+  betIdx: 1,
+  doubleBetActive: false,    // booster ⚡
+  bagBoosterUsed: false,     // booster 💰 was used this round
+  wildPending: false,        // booster 🎰 armed → drop wild on next swap
+  roundCoins: 0,
+  roundMatches: 0,
+  roundBags: 0,
+  roundEventTokens: 0,
+  roundGaeTokens: 0,
+  bestCascadeThisRound: 1,
+  cascadeDepth: 0,           // current chain depth (resets per swap)
+  busy: false,               // animations in flight → block input
+  selected: null,            // {r, c} of currently-selected tile (tap-tap mode)
+};
+
+function makeEmptyBoard() {
+  const b = new Array(BOARD_ROWS);
+  for (let r = 0; r < BOARD_ROWS; r++) {
+    b[r] = new Array(BOARD_COLS).fill(-1);
+  }
+  return b;
+}
+
+// Randomly fill the board such that no initial matches exist. We don't want
+// players to start with auto-cascades — the round should begin in a stable,
+// match-free state so the first move feels like a deliberate choice.
+function spawnFreshBoard() {
+  board = makeEmptyBoard();
+  for (let r = 0; r < BOARD_ROWS; r++) {
+    for (let c = 0; c < BOARD_COLS; c++) {
+      board[r][c] = pickFreshTile(r, c);
+    }
+  }
+}
+
+function pickFreshTile(r, c) {
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const t = Math.floor(Math.random() * NUM_COLORS);
+    // Check we wouldn't make an immediate horizontal/vertical match.
+    if (c >= 2 && board[r][c - 1] === t && board[r][c - 2] === t) continue;
+    if (r >= 2 && board[r - 1][c] === t && board[r - 2][c] === t) continue;
+    return t;
+  }
+  return Math.floor(Math.random() * NUM_COLORS);
+}
+
+// Sprinkle a fresh tile after a clear. Specials can spawn here with low
+// probability (money bags, wilds, event tiles).
+function pickReplenishTile() {
+  const r = Math.random();
+  if (EVENTS.dc && EVENTS.dc.active && r < EVENT_TILE_SPAWN_P) return TILE.EVENT_DC;
+  if (EVENTS.gae && EVENTS.gae.active && r < EVENT_TILE_SPAWN_P * 2) return TILE.GAE;
+  if (r < MONEY_BAG_SPAWN_P) return TILE.MONEY_BAG;
+  if (r < MONEY_BAG_SPAWN_P + WILD_SPAWN_P) return TILE.WILD;
+  return Math.floor(Math.random() * NUM_COLORS);
+}
+
+// Two tiles "match" for the purpose of detecting a 3-in-a-row. Wild matches
+// anything. Specials (money bag / event / GAE) only match themselves and
+// wilds (so they don't auto-clear together with regular colors).
+function tilesMatch(a, b) {
+  if (a === -1 || b === -1) return false;
+  if (a === TILE.WILD || b === TILE.WILD) return true;
+  return a === b;
+}
+
+// Find all match groups on the board. Returns a Set of "r,c" cell keys that
+// are part of any 3+ run, plus the count of distinct groups.
+function findMatches() {
+  const matchedCells = new Set();
+  let groupCount = 0;
+
+  // Horizontal runs
+  for (let r = 0; r < BOARD_ROWS; r++) {
+    let runStart = 0;
+    for (let c = 1; c <= BOARD_COLS; c++) {
+      const sameAsRun = c < BOARD_COLS &&
+        runMatchesAll(board[r][runStart], board[r][c], r, runStart, c, 'row');
+      if (!sameAsRun) {
+        const runLen = c - runStart;
+        if (runLen >= MIN_MATCH) {
+          groupCount++;
+          for (let k = runStart; k < c; k++) matchedCells.add(r + ',' + k);
+        }
+        runStart = c;
+      }
+    }
+  }
+
+  // Vertical runs
+  for (let c = 0; c < BOARD_COLS; c++) {
+    let runStart = 0;
+    for (let r = 1; r <= BOARD_ROWS; r++) {
+      const sameAsRun = r < BOARD_ROWS &&
+        runMatchesAll(board[runStart][c], board[r][c], runStart, c, r, 'col');
+      if (!sameAsRun) {
+        const runLen = r - runStart;
+        if (runLen >= MIN_MATCH) {
+          groupCount++;
+          for (let k = runStart; k < r; k++) matchedCells.add(k + ',' + c);
+        }
+        runStart = r;
+      }
+    }
+  }
+
+  return { cells: matchedCells, groups: groupCount };
+}
+
+// Helper for findMatches: ensures the WHOLE run is consistent, not just
+// adjacent pairs. (A run of [3, W, 3] is fine; a run of [3, W, 5] is not
+// because the wild "decides" what it represents based on its neighbors.)
+//
+// We resolve this by saying: a wild takes the value of the first non-wild
+// tile in the run. If the run is all wilds, treat it as a single match for
+// rendering purposes (highly rare; clears anyway).
+function runMatchesAll(startTile, nextTile, _a, _b, _c, _kind) {
+  if (startTile === -1 || nextTile === -1) return false;
+  if (startTile === TILE.WILD || nextTile === TILE.WILD) return true;
+  return startTile === nextTile;
+}
+
+// Try to swap (r1,c1) ↔ (r2,c2). Returns true if it produced any match,
+// else swaps back and returns false. Adjacency is required.
+function trySwap(r1, c1, r2, c2) {
+  if (Math.abs(r1 - r2) + Math.abs(c1 - c2) !== 1) return false;
+  const tmp = board[r1][c1]; board[r1][c1] = board[r2][c2]; board[r2][c2] = tmp;
+  const m = findMatches();
+  if (m.cells.size === 0) {
+    // Revert.
+    const tmp2 = board[r1][c1]; board[r1][c1] = board[r2][c2]; board[r2][c2] = tmp2;
+    return false;
+  }
+  return true;
+}
+
+// Gravity: after clearing matched cells, drop tiles down to fill gaps.
+function applyGravity() {
+  for (let c = 0; c < BOARD_COLS; c++) {
+    let writeRow = BOARD_ROWS - 1;
+    for (let r = BOARD_ROWS - 1; r >= 0; r--) {
+      if (board[r][c] !== -1) {
+        if (r !== writeRow) { board[writeRow][c] = board[r][c]; board[r][c] = -1; }
+        writeRow--;
+      }
+    }
+    // Spawn new tiles into the empties at the top of this column.
+    for (let r = writeRow; r >= 0; r--) {
+      board[r][c] = pickReplenishTile();
+    }
+  }
+}
+
+// Reshuffle. If we end up with no possible swaps that produce a match, we
+// rebuild the board (preserving non-wild specials when reasonable, but for
+// simplicity we just regenerate everything — that's the standard match-3
+// convention and players don't mind because it doesn't take a move).
+function hasPossibleMove() {
+  for (let r = 0; r < BOARD_ROWS; r++) {
+    for (let c = 0; c < BOARD_COLS; c++) {
+      const tries = [[r, c, r, c + 1], [r, c, r + 1, c]];
+      for (const [a, b, x, y] of tries) {
+        if (x >= BOARD_ROWS || y >= BOARD_COLS) continue;
+        const tmp = board[a][b]; board[a][b] = board[x][y]; board[x][y] = tmp;
+        const m = findMatches();
+        const tmp2 = board[a][b]; board[a][b] = board[x][y]; board[x][y] = tmp2;
+        if (m.cells.size > 0) return true;
+      }
+    }
+  }
+  return false;
+}
+
+function reshuffle() {
+  // Collect all tile values, shuffle, place back. Preserves the count of
+  // every tile type — players don't lose money bags / wilds when we shuffle.
+  const all = [];
+  for (let r = 0; r < BOARD_ROWS; r++) for (let c = 0; c < BOARD_COLS; c++) all.push(board[r][c]);
+  for (let i = all.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = all[i]; all[i] = all[j]; all[j] = tmp;
+  }
+  // Try a few placements that don't create immediate matches.
+  for (let attempt = 0; attempt < 6; attempt++) {
+    let idx = 0;
+    for (let r = 0; r < BOARD_ROWS; r++) {
+      for (let c = 0; c < BOARD_COLS; c++) {
+        board[r][c] = all[idx++];
+      }
+    }
+    if (findMatches().cells.size === 0 && hasPossibleMove()) return;
+    // Re-shuffle on collision.
+    for (let i = all.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = all[i]; all[i] = all[j]; all[j] = tmp;
+    }
+  }
+  // Last resort: rebuild fresh.
+  spawnFreshBoard();
+}
+
+/* =========================================================
+   [17] Round flow — bet → matches → cascades → tally
+   ========================================================= */
+
+function startRound(betIdx) {
+  const bet = BETS[betIdx];
+  if (!bet) return;
+  if (state.coins < bet.value) { toast(t('not_enough_coins')); haptic('err'); return; }
+  if (state.energy <= 0) { toast(t('not_enough_energy')); haptic('err'); return; }
+  state.coins -= bet.value;
+  state.energy -= 1;
+  if (state.energy < state.energyMax && !state.energyRegenAt) {
+    state.energyRegenAt = Date.now() + ENERGY_REGEN_MS;
+  }
+  state.preferredBetIdx = betIdx;
+  game.active = true;
+  game.movesLeft = STARTING_MOVES;
+  game.betValue = bet.value;
+  game.betIdx = betIdx;
+  game.doubleBetActive = false;
+  game.bagBoosterUsed = false;
+  game.wildPending = false;
+  game.roundCoins = 0;
+  game.roundMatches = 0;
+  game.roundBags = 0;
+  game.roundEventTokens = 0;
+  game.roundGaeTokens = 0;
+  game.bestCascadeThisRound = 1;
+  game.cascadeDepth = 0;
+  game.busy = false;
+  game.selected = null;
+  spawnFreshBoard();
+  saveState();
+  showScreen('game');
+  refreshAllUI();
+  renderBoard();
+  // If "no possible moves" on initial deal (very rare), reshuffle.
+  if (!hasPossibleMove()) reshuffle();
+}
+
+function endRound(forceTally) {
+  if (!game.active) return;
+  if (game.movesLeft > 0 && !forceTally) {
+    // Player tapped "End Round" early — confirm? For v0.1 keep simple, no confirm.
+  }
+  game.active = false;
+  // Roll the round's coins into vault + lifetime + best-round tracking.
+  const earned = Math.floor(game.roundCoins);
+  state.coins += earned;
+  state.totalCoinsEver += earned;
+  state.totalMatchesEver += game.roundMatches;
+  state.totalCascadesEver += (game.bestCascadeThisRound > 1 ? 1 : 0);
+  if (game.bestCascadeThisRound > state.bestCascadeEver) state.bestCascadeEver = game.bestCascadeThisRound;
+  if (earned > state.bestRoundCoinsEver) state.bestRoundCoinsEver = earned;
+  state.vaultLifetimeCoins += earned;
+  state.eventTokens += game.roundEventTokens;
+  // Contribute GAE to the server pool (fire-and-forget; no need to wait).
+  if (game.roundGaeTokens > 0 && TG && TG.initData) {
+    state.gaeContributed += game.roundGaeTokens;
+    fetch('/api/gae/contribute', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: TG.initData, amount: game.roundGaeTokens }),
+    }).catch(() => {});
+  }
+
+  // Vault tier-up check.
+  const oldTier = state.vaultTier;
+  let newTier = oldTier;
+  while (newTier + 1 < VAULT_TIERS.length && state.vaultLifetimeCoins >= VAULT_TIERS[newTier + 1].threshold) {
+    newTier++;
+  }
+  const tieredUp = newTier > oldTier;
+  if (tieredUp) {
+    state.vaultTier = newTier;
+    // Tier-up bonus — scales with tier index. Pure gift, no Stars cost.
+    const bonus = 500 * Math.pow(2, newTier);
+    state.coins += bonus;
+    state.totalCoinsEver += bonus;
+    showTierUpModal(VAULT_TIERS[newTier], bonus);
+  }
+  state.vaultProgress = state.vaultLifetimeCoins - VAULT_TIERS[state.vaultTier].threshold;
+
+  // Submit leaderboard score (lifetime coins).
+  if (TG && TG.initData) {
+    fetch('/api/score/submit', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: TG.initData, score: state.vaultLifetimeCoins, mode: 'regular' }),
+    }).catch(() => {});
+  }
+
+  saveState();
+  if (!tieredUp) showSummaryModal(earned);
+}
+
+// Called after every swap that produced a match. Resolves all cascades,
+// applies coins, advances cascade depth, then re-renders.
+async function resolveSwapMatches() {
+  game.busy = true;
+  game.cascadeDepth = 0;
+  while (true) {
+    const m = findMatches();
+    if (m.cells.size === 0) break;
+    game.cascadeDepth++;
+    game.roundMatches += m.groups;
+    if (game.cascadeDepth > game.bestCascadeThisRound) game.bestCascadeThisRound = game.cascadeDepth;
+
+    // Compute coins from this cascade step.
+    const mult = CASCADE_MULT[Math.min(game.cascadeDepth, CASCADE_MULT.length - 1)];
+    let stepCoins = 0;
+    const flyCoords = [];
+    for (const key of m.cells) {
+      const [r, c] = key.split(',').map(Number);
+      const tile = board[r][c];
+      let cellVal = TILE_VALUE[tile] || 1;
+      if (tile === TILE.MONEY_BAG) { game.roundBags++; }
+      if (tile === TILE.EVENT_DC)  { game.roundEventTokens++; }
+      if (tile === TILE.GAE)        { game.roundGaeTokens++; }
+      const betMult = game.doubleBetActive ? (game.betValue * 2) : game.betValue;
+      const earn = cellVal * betMult * mult;
+      stepCoins += earn;
+      flyCoords.push({ r, c, earn });
+    }
+    game.roundCoins += stepCoins;
+
+    // Visual + haptic feedback.
+    if (game.cascadeDepth === 1) haptic('tap');
+    else if (game.cascadeDepth === 2) haptic('med');
+    else if (game.cascadeDepth === 3) haptic('heavy');
+    else if (game.cascadeDepth >= 4) { haptic('success'); flashMegaCascade(); }
+    showCascadeMeter(game.cascadeDepth, mult);
+    drawFloatingCoins(flyCoords);
+
+    // Animate clear: mark cells as -1 then redraw.
+    for (const key of m.cells) {
+      const [r, c] = key.split(',').map(Number);
+      board[r][c] = -1;
+    }
+    renderBoard(m.cells);
+    await wait(220);
+
+    applyGravity();
+    renderBoard();
+    await wait(180);
+  }
+  game.cascadeDepth = 0;
+  hideCascadeMeter();
+
+  if (!hasPossibleMove()) {
+    toast(t('no_more_moves'));
+    await wait(600);
+    reshuffle();
+    renderBoard();
+  }
+
+  game.busy = false;
+  refreshAllUI();
+  saveState();
+
+  // End round if moves exhausted.
+  if (game.movesLeft <= 0) {
+    await wait(400);
+    endRound(true);
+  }
+}
+
+function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+/* =========================================================
+   [18] Rendering — canvas
+   ========================================================= */
+
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+let cellPx = 40;           // computed at resize
+let cellPad = 4;           // gap between tiles
+
+function resizeBoardCanvas() {
+  const wrap = document.getElementById('canvas-wrap');
+  if (!wrap) return;
+  const rect = wrap.getBoundingClientRect();
+  const avail = Math.min(rect.width - 16, rect.height - 16);
+  const size = Math.max(280, Math.min(480, Math.floor(avail)));
+  canvas.style.width = size + 'px';
+  canvas.style.height = size + 'px';
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = size * dpr;
+  canvas.height = size * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  cellPx = Math.floor(size / BOARD_COLS);
+  cellPad = Math.max(2, Math.floor(cellPx * 0.08));
+  renderBoard();
+}
+
+function cellRect(r, c) {
+  return {
+    x: c * cellPx + cellPad,
+    y: r * cellPx + cellPad,
+    w: cellPx - cellPad * 2,
+    h: cellPx - cellPad * 2,
+  };
+}
+
+function renderBoard(highlightCells) {
+  if (!ctx) return;
+  const cssSize = parseInt(canvas.style.width || '360', 10);
+  ctx.clearRect(0, 0, cssSize, cssSize);
+
+  // Background panel — subtle dark inset for the playing field.
+  ctx.fillStyle = 'rgba(255,255,255,0.04)';
+  roundRect(ctx, 0, 0, cssSize, cssSize, 16);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  for (let r = 0; r < BOARD_ROWS; r++) {
+    for (let c = 0; c < BOARD_COLS; c++) {
+      const t = board[r][c];
+      if (t === -1) continue;
+      const rect = cellRect(r, c);
+      drawTile(t, rect.x, rect.y, rect.w, rect.h,
+        game.selected && game.selected.r === r && game.selected.c === c,
+        highlightCells && highlightCells.has(r + ',' + c));
+    }
+  }
+}
+
+function drawTile(t, x, y, w, h, selected, highlighted) {
+  // Color-block background.
+  ctx.fillStyle = TILE_BG[t] || '#888';
+  roundRect(ctx, x, y, w, h, w * 0.18);
+  ctx.fill();
+
+  // Inner highlight stripe for "shine" effect.
+  const grad = ctx.createLinearGradient(x, y, x, y + h);
+  grad.addColorStop(0, 'rgba(255,255,255,0.35)');
+  grad.addColorStop(0.5, 'rgba(255,255,255,0)');
+  grad.addColorStop(1, 'rgba(0,0,0,0.25)');
+  ctx.fillStyle = grad;
+  roundRect(ctx, x, y, w, h, w * 0.18);
+  ctx.fill();
+
+  // Selection ring.
+  if (selected) {
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#ffe98a';
+    ctx.shadowColor = '#ffc94a';
+    ctx.shadowBlur = 12;
+    roundRect(ctx, x + 2, y + 2, w - 4, h - 4, w * 0.16);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  // Match-clear flash.
+  if (highlighted) {
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    roundRect(ctx, x, y, w, h, w * 0.18);
+    ctx.fill();
+  }
+
+  // Emoji centered.
+  const emoji = TILE_EMOJI[t] || '?';
+  ctx.font = `${Math.floor(w * 0.62)}px -apple-system, system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#000';
+  ctx.fillText(emoji, x + w / 2, y + h / 2 + h * 0.02);
+}
+
+function roundRect(c, x, y, w, h, r) {
+  if (typeof c.roundRect === 'function') { c.beginPath(); c.roundRect(x, y, w, h, r); return; }
+  c.beginPath();
+  c.moveTo(x + r, y);
+  c.lineTo(x + w - r, y);
+  c.quadraticCurveTo(x + w, y, x + w, y + r);
+  c.lineTo(x + w, y + h - r);
+  c.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  c.lineTo(x + r, y + h);
+  c.quadraticCurveTo(x, y + h, x, y + h - r);
+  c.lineTo(x, y + r);
+  c.quadraticCurveTo(x, y, x + r, y);
+  c.closePath();
+}
+
+window.addEventListener('resize', resizeBoardCanvas);
+
+/* =========================================================
+   [19] Input — tap-tap to swap (plus swipe shortcut)
+   ========================================================= */
+
+function getCellFromPointer(ev) {
+  const rect = canvas.getBoundingClientRect();
+  const cssSize = rect.width;
+  const px = (ev.clientX - rect.left) * (BOARD_COLS / (cssSize / cellPx)) / (BOARD_COLS);
+  // Simpler: use board geometry directly.
+  const x = ev.clientX - rect.left;
+  const y = ev.clientY - rect.top;
+  const c = Math.floor(x / (cssSize / BOARD_COLS));
+  const r = Math.floor(y / (cssSize / BOARD_ROWS));
+  if (r < 0 || r >= BOARD_ROWS || c < 0 || c >= BOARD_COLS) return null;
+  return { r, c };
+}
+
+let touchStart = null;
+canvas.addEventListener('pointerdown', (ev) => {
+  ev.preventDefault();
+  if (!game.active || game.busy) return;
+  const cell = getCellFromPointer(ev);
+  if (!cell) return;
+  touchStart = { ...cell, x: ev.clientX, y: ev.clientY };
+  // Tap-tap mode: first tap selects, second tap on adjacent swaps.
+  if (game.selected) {
+    if (Math.abs(game.selected.r - cell.r) + Math.abs(game.selected.c - cell.c) === 1) {
+      attemptSwap(game.selected.r, game.selected.c, cell.r, cell.c);
+      game.selected = null;
+      renderBoard();
+      return;
+    } else if (game.selected.r === cell.r && game.selected.c === cell.c) {
+      game.selected = null;
+      renderBoard();
+      return;
+    }
+  }
+  game.selected = cell;
+  renderBoard();
+});
+
+canvas.addEventListener('pointerup', (ev) => {
+  if (!game.active || game.busy || !touchStart) { touchStart = null; return; }
+  const dx = ev.clientX - touchStart.x;
+  const dy = ev.clientY - touchStart.y;
+  const adx = Math.abs(dx), ady = Math.abs(dy);
+  const THRESH = 18;
+  if (adx > THRESH || ady > THRESH) {
+    // Swipe — translate to a swap with the adjacent tile in that direction.
+    const from = { r: touchStart.r, c: touchStart.c };
+    let to;
+    if (adx > ady) to = { r: from.r, c: from.c + (dx > 0 ? 1 : -1) };
+    else to = { r: from.r + (dy > 0 ? 1 : -1), c: from.c };
+    if (to.r >= 0 && to.r < BOARD_ROWS && to.c >= 0 && to.c < BOARD_COLS) {
+      attemptSwap(from.r, from.c, to.r, to.c);
+    }
+    game.selected = null;
+    renderBoard();
+  }
+  touchStart = null;
+});
+
+canvas.addEventListener('pointercancel', () => { touchStart = null; });
+
+function attemptSwap(r1, c1, r2, c2) {
+  if (game.wildPending) {
+    // Drop wild into the destination cell.
+    board[r2][c2] = TILE.WILD;
+    state.wildBoosterTokens--;
+    game.wildPending = false;
+    setBoosterArmed('wild', false);
+    refreshAllUI();
+  }
+  const ok = trySwap(r1, c1, r2, c2);
+  if (!ok) {
+    haptic('err');
+    // Visual "shake": briefly highlight both cells.
+    renderBoard(new Set([r1 + ',' + c1, r2 + ',' + c2]));
+    setTimeout(renderBoard, 140);
+    return;
+  }
+  game.movesLeft--;
+  refreshAllUI();
+  renderBoard();
+  resolveSwapMatches();
+}
+
+/* =========================================================
+   [20] Floating coins + cascade UI + mega splash
+   ========================================================= */
+
+function drawFloatingCoins(coords) {
+  const rect = canvas.getBoundingClientRect();
+  const cssSize = rect.width;
+  const cellCss = cssSize / BOARD_COLS;
+  for (const co of coords) {
+    const el = document.createElement('div');
+    el.className = 'float-coin';
+    el.textContent = '+' + Math.floor(co.earn);
+    const cx = rect.left + (co.c + 0.5) * cellCss;
+    const cy = rect.top + (co.r + 0.5) * cellCss;
+    el.style.left = (cx - 16) + 'px';
+    el.style.top  = (cy - 10) + 'px';
+    document.body.appendChild(el);
+    requestAnimationFrame(() => {
+      el.style.transform = 'translate(0, -64px) scale(1.2)';
+      el.style.opacity = '0';
+    });
+    setTimeout(() => el.remove(), 850);
+  }
+}
+
+const cascadeMeter = document.getElementById('cascade-meter');
+const cascadeMult = document.getElementById('cascade-mult');
+function showCascadeMeter(depth, mult) {
+  if (depth < 2) return;
+  if (depth >= 4) cascadeMeter.classList.add('mega');
+  else cascadeMeter.classList.remove('mega');
+  cascadeMult.textContent = depth >= 4
+    ? t('mega_cascade') + ' x' + mult.toFixed(1).replace(/\.0$/, '')
+    : t('cascade_x', { n: 'x' + mult.toFixed(1).replace(/\.0$/, '') });
+  cascadeMeter.classList.add('show');
+}
+function hideCascadeMeter() {
+  cascadeMeter.classList.remove('show');
+  cascadeMeter.classList.remove('mega');
+}
+
+function flashMegaCascade() {
+  const splash = document.getElementById('mega-splash');
+  document.getElementById('mega-text').textContent = t('mega_cascade');
+  splash.classList.add('show');
+  setTimeout(() => splash.classList.remove('show'), 1100);
+}
+
+/* =========================================================
+   [21] Screens & UI refresh
+   ========================================================= */
+
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+  const target = document.getElementById('screen-' + name);
+  if (target) target.classList.add('active');
+  if (name === 'title') drawTitleVault();
+  if (name === 'bet') refreshBetGrid();
+}
+
+function refreshAllUI() {
+  // Title topbar
+  document.getElementById('title-coins').textContent = fmtNum(state.coins);
+  document.getElementById('title-energy').textContent = state.energy;
+  document.getElementById('title-energy-max').textContent = state.energyMax;
+  // Bet topbar
+  document.getElementById('bet-coins').textContent = fmtNum(state.coins);
+  document.getElementById('bet-energy').textContent = state.energy;
+  document.getElementById('bet-energy-max').textContent = state.energyMax;
+  // Game topbar + moves + round coins
+  document.getElementById('game-coins').textContent = fmtNum(state.coins);
+  document.getElementById('moves-num').textContent = game.movesLeft;
+  const mp = document.getElementById('moves-pill');
+  if (game.movesLeft <= 3) mp.classList.add('low'); else mp.classList.remove('low');
+  document.getElementById('round-num').textContent = fmtNum(Math.floor(game.roundCoins));
+  // Vault bar (title)
+  const tier = VAULT_TIERS[state.vaultTier];
+  const next = VAULT_TIERS[state.vaultTier + 1];
+  document.getElementById('title-vault-name').textContent =
+    tier.emoji + ' ' + tier.name + ' · Tier ' + (state.vaultTier + 1);
+  const span = next ? next.threshold - tier.threshold : 1;
+  const prog = next ? Math.min(1, state.vaultProgress / span) : 1;
+  document.getElementById('title-vault-fill').style.width = (prog * 100) + '%';
+  // Booster counts
+  document.getElementById('cnt-bet').textContent  = state.betBoosterTokens;
+  document.getElementById('cnt-wild').textContent = state.wildBoosterTokens;
+  document.getElementById('cnt-bag').textContent  = state.bagBoosterTokens;
+  document.getElementById('bst-bet').classList.toggle('empty',  state.betBoosterTokens  <= 0);
+  document.getElementById('bst-wild').classList.toggle('empty', state.wildBoosterTokens <= 0);
+  document.getElementById('bst-bag').classList.toggle('empty',  state.bagBoosterTokens  <= 0);
+}
+
+function refreshEnergyCountdown() {
+  const el = document.getElementById('energy-countdown');
+  if (!el) return;
+  el.textContent = energyCountdownStr();
+}
+
+function fmtNum(n) {
+  n = Math.floor(n);
+  if (n >= 1e9) return (n / 1e9).toFixed(1).replace(/\.0$/, '') + 'B';
+  if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (n >= 1e4) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
+  return n.toLocaleString('en-US');
+}
+
+/* =========================================================
+   [22] Title-screen vault (decorative canvas)
+   ========================================================= */
+
+function drawTitleVault() {
+  const c = document.getElementById('title-vault-canvas');
+  if (!c) return;
+  const ctx2 = c.getContext('2d');
+  const w = c.width, h = c.height;
+  ctx2.clearRect(0, 0, w, h);
+  const tier = VAULT_TIERS[state.vaultTier];
+
+  // Glow
+  const glow = ctx2.createRadialGradient(w/2, h/2, 20, w/2, h/2, w/2);
+  glow.addColorStop(0, tier.color + 'cc');
+  glow.addColorStop(0.5, tier.color + '44');
+  glow.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx2.fillStyle = glow;
+  ctx2.fillRect(0, 0, w, h);
+
+  // Vault emoji (huge)
+  ctx2.font = '140px -apple-system, system-ui';
+  ctx2.textAlign = 'center';
+  ctx2.textBaseline = 'middle';
+  ctx2.fillText(tier.emoji, w / 2, h / 2 + 10);
+}
+
+/* =========================================================
+   [23] Bet screen
+   ========================================================= */
+
+function refreshBetGrid() {
+  const grid = document.getElementById('bet-grid');
+  grid.innerHTML = '';
+  BETS.forEach((b, i) => {
+    const cell = document.createElement('div');
+    const locked = state.vaultTier < b.unlockTier;
+    cell.className = 'bet-card' + (locked ? ' locked' : '') + (i === state.preferredBetIdx ? ' selected' : '');
+    cell.innerHTML = '<div class="amt">' + b.label + '</div><div class="lbl">' + t('bet_label') + '</div>' +
+      (locked ? '<div class="lock">🔒</div>' : '');
+    cell.addEventListener('click', () => {
+      if (locked) {
+        toast(t('bet_locked') + ' ' + VAULT_TIERS[b.unlockTier].name);
+        return;
+      }
+      state.preferredBetIdx = i;
+      saveState();
+      refreshBetGrid();
+      refreshBetEv();
+    });
+    grid.appendChild(cell);
+  });
+  refreshBetEv();
+  const note = document.getElementById('bet-iap-note');
+  if (note) {
+    if (!IAP_ENABLED) { note.style.display = 'block'; note.textContent = t('no_iap'); }
+    else note.style.display = 'none';
+  }
+}
+
+function refreshBetEv() {
+  const b = BETS[state.preferredBetIdx] || BETS[0];
+  // Rough expected-value computation, just for player intuition. Not exact;
+  // it's a UX hint, not an actuarial calculation.
+  // Avg match clears ~4 tiles × ~1.7 value × cascade ~1.5 = ~10.2 units.
+  // Over 10 moves → ~102 units. × bet = expected coins.
+  // Mega payout assumes 5-cascade × 5 tiles × 2.5 value = ~62.5 units × 5x cascade.
+  const avg = Math.floor(102 * b.value);
+  const max = Math.floor(312 * b.value);
+  document.getElementById('ev-bet').textContent = fmtNum(b.value);
+  document.getElementById('ev-avg').textContent = '~' + fmtNum(avg);
+  document.getElementById('ev-max').textContent = '~' + fmtNum(max);
+}
+
+/* =========================================================
+   [24] Modals — summary, daily chest, shop, settings, leaderboard
+   ========================================================= */
+
+const modalBack = document.getElementById('modal-back');
+const modalEl = document.getElementById('modal');
+function openModal(html) {
+  modalEl.innerHTML = '<div class="modal-close" id="modal-close">×</div>' + html;
+  modalBack.classList.add('show');
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+}
+function closeModal() { modalBack.classList.remove('show'); }
+modalBack.addEventListener('click', (ev) => { if (ev.target === modalBack) closeModal(); });
+
+function showSummaryModal(earned) {
+  const html =
+    '<h2>' + t('round_complete') + '</h2>' +
+    '<div class="summary-amt"><div class="v">+' + fmtNum(earned) + '</div><div class="l">' + t('coins_earned') + '</div></div>' +
+    '<div class="summary-stats">' +
+      '<div class="cell"><div class="n">x' + game.bestCascadeThisRound + '</div><div class="k">' + t('best_cascade') + '</div></div>' +
+      '<div class="cell"><div class="n">' + game.roundMatches + '</div><div class="k">' + t('matches_made') + '</div></div>' +
+      '<div class="cell"><div class="n">' + game.roundBags + '</div><div class="k">' + t('bags_collected') + '</div></div>' +
+    '</div>' +
+    '<div class="actions">' +
+      '<button class="btn" id="sum-again">' + t('play_again') + '</button>' +
+      '<button class="btn ghost" id="sum-title">' + t('back_to_title') + '</button>' +
+    '</div>';
+  openModal(html);
+  document.getElementById('sum-again').addEventListener('click', () => {
+    closeModal();
+    showScreen('bet');
+  });
+  document.getElementById('sum-title').addEventListener('click', () => {
+    closeModal();
+    showScreen('title');
+    refreshAllUI();
+  });
+}
+
+function showTierUpModal(tier, bonus) {
+  const html =
+    '<div class="tier-up">' +
+      '<h2>' + t('new_tier') + '</h2>' +
+      '<div class="big">' + tier.emoji + '</div>' +
+      '<div class="new-name">' + tier.name + '</div>' +
+      '<div class="sub">' + t('tier_reward', { n: fmtNum(bonus) }) + '</div>' +
+      '<div class="actions"><button class="btn" id="tu-ok">' + t('lets_go') + '</button></div>' +
+    '</div>';
+  openModal(html);
+  haptic('success');
+  document.getElementById('tu-ok').addEventListener('click', () => {
+    closeModal();
+    // After tier-up, also show the summary so player sees totals.
+    showSummaryModal(game.roundCoins);
+  });
+}
+
+function showWelcomeModal() {
+  const html =
+    '<h2>' + t('welcome_title') + '</h2>' +
+    '<div class="sub">' + t('welcome_body') + '</div>' +
+    '<div class="actions"><button class="btn" id="wel-ok">' + t('lets_go') + '</button></div>';
+  openModal(html);
+  document.getElementById('wel-ok').addEventListener('click', () => {
+    state.welcomed = true;
+    saveState();
+    closeModal();
+  });
+}
+
+/* =========================================================
+   [25] Daily chest
+   ========================================================= */
+
+function todayYMD() {
+  const d = new Date();
+  return d.getUTCFullYear() + '-' + String(d.getUTCMonth()+1).padStart(2,'0') + '-' + String(d.getUTCDate()).padStart(2,'0');
+}
+function yesterdayYMD() {
+  const d = new Date(); d.setUTCDate(d.getUTCDate() - 1);
+  return d.getUTCFullYear() + '-' + String(d.getUTCMonth()+1).padStart(2,'0') + '-' + String(d.getUTCDate()).padStart(2,'0');
+}
+
+function canClaimDaily() {
+  return state.dailyChestYMD !== todayYMD();
+}
+
+function nextChestDay() {
+  // If we already cycled through day 7, restart at day 1.
+  if (state.dailyChestDay >= 7) return 1;
+  // If we missed a day, streak breaks — restart at day 1.
+  if (state.dailyChestYMD && state.dailyChestYMD !== yesterdayYMD()) return 1;
+  return state.dailyChestDay + 1;
+}
+
+function showDailyModal() {
+  const today = todayYMD();
+  const next = nextChestDay();
+  const claimable = canClaimDaily();
+  let cells = '';
+  for (let i = 0; i < 7; i++) {
+    const day = i + 1;
+    const item = DAILY_CHEST[i];
+    const isToday = (claimable && day === next) || (!claimable && day === state.dailyChestDay);
+    const claimedByPrior = !claimable && day < state.dailyChestDay;
+    const futureDay = claimable ? (day > next) : (day > state.dailyChestDay);
+    cells +=
+      '<div class="chest-day' +
+        (isToday ? ' today' : '') +
+        (claimedByPrior ? ' claimed' : '') +
+        (futureDay ? ' future' : '') + '">' +
+        '<div class="d">' + day + '</div>' +
+        '<div class="em">' + item.em + '</div>' +
+        '<div class="amt">+' + fmtNum(item.coins) +
+          (item.energy ? ' ⚡' + item.energy : '') +
+        '</div>' +
+      '</div>';
+  }
+  const html =
+    '<h2>' + t('daily_chest') + '</h2>' +
+    '<div class="sub">' + t('daily_streak', { n: state.streak }) + '</div>' +
+    '<div class="chest-grid">' + cells + '</div>' +
+    '<div class="actions">' +
+      (claimable
+        ? '<button class="btn" id="claim-daily">' + t('claim') + ' Day ' + next + '</button>'
+        : '<div class="center opacity-60">' + t('come_back_tomorrow') + '</div>') +
+    '</div>';
+  openModal(html);
+  if (claimable) {
+    document.getElementById('claim-daily').addEventListener('click', () => {
+      claimDaily();
+      closeModal();
+    });
+  }
+}
+
+function claimDaily() {
+  if (!canClaimDaily()) return;
+  const next = nextChestDay();
+  const item = DAILY_CHEST[next - 1];
+  // Track streak based on whether YMD jumped by 1 or reset.
+  if (state.dailyChestYMD === yesterdayYMD()) {
+    state.streak = (state.streak || 0) + 1;
+  } else {
+    state.streak = 1;
+  }
+  state.coins += item.coins;
+  state.totalCoinsEver += item.coins;
+  if (item.energy) state.energy = Math.min(state.energyMax + item.energy, state.energy + item.energy);
+  state.dailyChestYMD = todayYMD();
+  state.dailyChestDay = next;
+  saveState();
+  refreshAllUI();
+  haptic('success');
+  toast('+' + fmtNum(item.coins) + ' 💰' + (item.energy ? ' +' + item.energy + ' ⚡' : ''));
+}
+
+/* =========================================================
+   [26] Shop
+   ========================================================= */
+
+function showShopModal() {
+  // Default catalog (used when server SKUs haven't loaded yet — covers local
+  // dev where IAP is disabled but we still want the UI to render correctly).
+  const items = SKUS.length ? SKUS : [
+    { id: 'starter_pack',  title: 'Starter Pack',      description: '10,000 coins + 5 ⚡ + Pirate skin', price: 199 },
+    { id: 'coins_small',   title: '5,000 Coins',       description: 'Coin Pile', price: 99 },
+    { id: 'coins_medium',  title: '20,000 Coins',      description: '+25% bonus', price: 299 },
+    { id: 'coins_large',   title: '50,000 Coins',      description: '+40% bonus', price: 599 },
+    { id: 'coins_mega',    title: '100,000 Coins',     description: '+60% bonus', price: 999 },
+    { id: 'energy_refill', title: 'Energy Refill +5',  description: 'Instant refill', price: 40 },
+    { id: 'bet_booster',   title: 'Double-Bet ×5',     description: '2× bet multiplier', price: 99 },
+    { id: 'wild_booster',  title: 'Wild Tile ×5',      description: 'Place a wild', price: 99 },
+    { id: 'bag_booster',   title: 'Money-Bag ×5',      description: 'Seed 3 money bags', price: 149 },
+  ];
+  const icons = {
+    starter_pack: '🎁', coins_small: '💰', coins_medium: '💰', coins_large: '💰', coins_mega: '💰',
+    energy_refill: '⚡', bet_booster: '⚡', wild_booster: '🎰', bag_booster: '💰',
+    skin_pirate: '🏴‍☠️', skin_dragon: '🐉', skin_royal: '👑', battle_pass: '⭐', test_purchase: '🧪',
+  };
+  let rows = '';
+  for (const it of items) {
+    const featured = it.id === 'starter_pack' ? ' featured' : '';
+    rows +=
+      '<div class="shop-item' + featured + '" data-sku="' + it.id + '">' +
+        '<div class="ico">' + (icons[it.id] || '💎') + '</div>' +
+        '<div class="info">' +
+          '<div class="title">' + it.title + '</div>' +
+          '<div class="desc">' + it.description + '</div>' +
+        '</div>' +
+        '<div class="price">' + it.price + ' ⭐</div>' +
+      '</div>';
+  }
+  const html =
+    '<h2>' + t('shop_title') + '</h2>' +
+    '<div class="sub">' + t('shop_subtitle') + '</div>' +
+    rows +
+    (IAP_ENABLED ? '' : '<div class="no-iap-note">' + t('no_iap') + '</div>');
+  openModal(html);
+  modalEl.querySelectorAll('.shop-item').forEach(el => {
+    el.addEventListener('click', () => buySku(el.getAttribute('data-sku')));
+  });
+}
+
+/* =========================================================
+   [27] Settings + language picker
+   ========================================================= */
+
+function showSettingsModal() {
+  const html =
+    '<h2>' + t('settings_title') + '</h2>' +
+    '<div class="row"><div>' + t('language') + '</div><div class="opacity-60" id="lang-current">' + (LANGS.find(l => l.code === state.lang)?.name || state.lang) + '</div></div>' +
+    '<div class="lang-grid" id="lang-grid"></div>' +
+    '<div class="row mt-12"><div class="opacity-60">Version</div><div class="opacity-60">' + VERSION + '</div></div>';
+  openModal(html);
+  const grid = document.getElementById('lang-grid');
+  for (const l of LANGS) {
+    const cell = document.createElement('div');
+    cell.className = 'lang-cell' + (l.code === state.lang ? ' active' : '');
+    cell.innerHTML = '<span class="flag">' + l.flag + '</span>' + l.name;
+    cell.addEventListener('click', () => {
+      state.lang = l.code;
+      saveState();
+      applyI18n();
+      refreshAllUI();
+      closeModal();
+      setTimeout(showSettingsModal, 100);
+    });
+    grid.appendChild(cell);
+  }
+}
+
+/* =========================================================
+   [28] Leaderboard
+   ========================================================= */
+
+let lbMode = 'regular';
+let lbCache = { regular: null, daily: null };
+
+async function showLeaderboardModal() {
+  const html =
+    '<h2>' + t('leaderboard') + '</h2>' +
+    '<div class="lb-tabs">' +
+      '<div class="lb-tab' + (lbMode === 'regular' ? ' active' : '') + '" data-m="regular">' + t('lb_global') + '</div>' +
+      '<div class="lb-tab' + (lbMode === 'daily' ? ' active' : '') + '" data-m="daily">' + t('lb_today') + '</div>' +
+    '</div>' +
+    '<div class="lb-list" id="lb-list">Loading…</div>';
+  openModal(html);
+  modalEl.querySelectorAll('.lb-tab').forEach(el => {
+    el.addEventListener('click', () => {
+      lbMode = el.getAttribute('data-m');
+      showLeaderboardModal();
+    });
+  });
+  try {
+    const r = await fetch('/api/leaderboard?mode=' + lbMode);
+    const d = await r.json();
+    renderLeaderboard(d.top || []);
+  } catch (e) {
+    document.getElementById('lb-list').textContent = '—';
+  }
+}
+
+function renderLeaderboard(top) {
+  const list = document.getElementById('lb-list');
+  if (!list) return;
+  if (!top.length) { list.textContent = t('lb_empty'); return; }
+  const myId = (TG && TG.initDataUnsafe && TG.initDataUnsafe.user && TG.initDataUnsafe.user.id) || null;
+  list.innerHTML = top.slice(0, 50).map((e, i) =>
+    '<div class="lb-row' + (myId && e.uid === myId ? ' me' : '') + '">' +
+      '<div class="rank">' + (i + 1) + '</div>' +
+      '<div class="name">' + escapeHtml(e.name) + (myId && e.uid === myId ? ' (' + t('you_label') + ')' : '') + '</div>' +
+      '<div class="score">' + fmtNum(e.score) + ' 💰</div>' +
+    '</div>'
+  ).join('');
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+
+/* =========================================================
+   [29] Pause modal
+   ========================================================= */
+
+function showPauseModal() {
+  const html =
+    '<h2>' + t('paused') + '</h2>' +
+    '<div class="actions">' +
+      '<button class="btn" id="ps-resume">' + t('resume') + '</button>' +
+      '<button class="btn ghost" id="ps-quit">' + t('quit') + '</button>' +
+    '</div>';
+  openModal(html);
+  document.getElementById('ps-resume').addEventListener('click', closeModal);
+  document.getElementById('ps-quit').addEventListener('click', () => {
+    closeModal();
+    if (game.active) endRound(true);
+    showScreen('title');
+  });
+}
+
+/* =========================================================
+   [30] Toast (lightweight)
+   ========================================================= */
+
+let toastTimer = 0;
+function toast(msg) {
+  let el = document.getElementById('toast-el');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'toast-el';
+    el.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);' +
+      'bottom:120px;background:rgba(20,12,38,0.92);color:#fff;padding:10px 18px;' +
+      'border-radius:999px;font-size:13px;border:1px solid rgba(255,255,255,0.18);' +
+      'box-shadow:0 4px 12px rgba(0,0,0,0.4);z-index:200;pointer-events:none;' +
+      'opacity:0;transition:opacity 200ms';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.opacity = '1';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.style.opacity = '0'; }, 1800);
+}
+
+/* =========================================================
+   [31] Boosters
+   ========================================================= */
+
+function setBoosterArmed(kind, on) {
+  const id = kind === 'bet' ? 'bst-bet' : (kind === 'wild' ? 'bst-wild' : 'bst-bag');
+  document.getElementById(id).classList.toggle('armed', !!on);
+}
+
+document.getElementById('bst-bet').addEventListener('click', () => {
+  if (!game.active) return;
+  if (state.betBoosterTokens <= 0) { toast('No tokens'); haptic('err'); return; }
+  if (game.doubleBetActive) { toast('Already 2×'); return; }
+  state.betBoosterTokens--;
+  game.doubleBetActive = true;
+  setBoosterArmed('bet', true);
+  refreshAllUI();
+  haptic('med');
+  toast('2× BET active');
+});
+
+document.getElementById('bst-wild').addEventListener('click', () => {
+  if (!game.active || game.busy) return;
+  if (state.wildBoosterTokens <= 0) { toast('No tokens'); haptic('err'); return; }
+  game.wildPending = true;
+  setBoosterArmed('wild', true);
+  toast('Tap a tile, then swap');
+});
+
+document.getElementById('bst-bag').addEventListener('click', () => {
+  if (!game.active || game.busy) return;
+  if (state.bagBoosterTokens <= 0) { toast('No tokens'); haptic('err'); return; }
+  if (game.bagBoosterUsed) { toast('Already used'); return; }
+  state.bagBoosterTokens--;
+  game.bagBoosterUsed = true;
+  // Drop 3 money bags onto random empty-ish positions.
+  let placed = 0, tries = 0;
+  while (placed < 3 && tries < 30) {
+    tries++;
+    const r = Math.floor(Math.random() * BOARD_ROWS);
+    const c = Math.floor(Math.random() * BOARD_COLS);
+    if (board[r][c] !== TILE.MONEY_BAG) { board[r][c] = TILE.MONEY_BAG; placed++; }
+  }
+  renderBoard();
+  refreshAllUI();
+  haptic('success');
+  toast('+3 💰 placed');
+});
+
+/* =========================================================
+   [32] Wire-up — buttons
+   ========================================================= */
+
+document.getElementById('btn-play').addEventListener('click', () => {
+  if (state.energy <= 0) { toast(t('not_enough_energy')); haptic('err'); return; }
+  if (!state.welcomed) { showWelcomeModal(); return; }
+  showScreen('bet');
+});
+
+document.getElementById('bet-back').addEventListener('click', () => showScreen('title'));
+document.getElementById('btn-start-round').addEventListener('click', () => {
+  startRound(state.preferredBetIdx);
+});
+
+document.getElementById('btn-pause').addEventListener('click', showPauseModal);
+document.getElementById('btn-give-up').addEventListener('click', () => {
+  if (game.active) endRound(true);
+});
+
+document.getElementById('btn-daily').addEventListener('click', showDailyModal);
+document.getElementById('btn-shop').addEventListener('click', showShopModal);
+document.getElementById('btn-settings').addEventListener('click', showSettingsModal);
+document.getElementById('btn-leaderboard').addEventListener('click', showLeaderboardModal);
+
+/* =========================================================
+   [33] Boot
+   ========================================================= */
+
+(async function boot() {
+  tgReady();
+  applyI18n();
+  refreshAllUI();
+  resizeBoardCanvas();
+  drawTitleVault();
+  // Auto-open daily chest on first visit of the day, if claimable.
+  // We want this to feel like a present, not a chore — open the modal AND
+  // auto-claim instantly so the player can dismiss with one tap.
+  if (canClaimDaily() && state.welcomed) {
+    setTimeout(showDailyModal, 600);
+  }
+  await fetchServerFlags();
+  await serverStateLoad();
+  setInterval(pollPurchases, 5000);
+  // Bot heartbeat — keeps server-side notif loop fed.
+  if (TG && TG.initData) {
+    fetch('/api/heartbeat', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: TG.initData, lang: state.lang, streak: state.streak }),
+    }).catch(() => {});
+  }
+})();
+
+</script>
+</body>
+</html>
