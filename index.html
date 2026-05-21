@@ -1492,6 +1492,7 @@ const defaultState = () => ({
   meter: { hammer: 0, pig: 0, shield: 0 },
   armed: { hammer: false, rocket: false, bomb: false },
   freeSpinsLeft: 0,
+  muted: false,
   streak: 0,
   dailyChestYMD: '',
   dailyChestDay: 0,
@@ -1714,7 +1715,7 @@ async function serverSyncNow() {
   try {
     const SYNC_KEYS = ['coins','energy','energyMax','energyRegenAt','vaultLifetimeCoins',
       'theme','village','masterDamage','shieldsStocked',
-      'boost','meter','armed','freeSpinsLeft',
+      'boost','meter','armed','freeSpinsLeft','muted',
       'streak','dailyChestYMD','dailyChestDay',
       'totalMatchesEver','bestCascadeEver','totalGoldEarnedEver',
       'totalSmashEver','totalRaidEver','betIdx',
@@ -1868,6 +1869,76 @@ let screenShake = { intensity: 0, duration: 0, start: 0 };
 // up smoothly instead of jumping. Updated in tick(); read by refreshGoldUI.
 let displayedGold = 0;
 const now = performance.now.bind(performance);
+
+// =========================================================
+// SFX — synthesized via Web Audio API (no asset files).
+// Mute toggle in settings. Audio context lazy-inits on first
+// user gesture (Telegram WebView suspends audio until then).
+// =========================================================
+let audioCtx = null;
+let audioUnlocked = false;
+function audioInit() {
+  if (audioCtx) return audioCtx;
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (Ctx) audioCtx = new Ctx();
+  } catch (e) {}
+  return audioCtx;
+}
+function unlockAudio() {
+  if (audioUnlocked) return;
+  const ac = audioInit();
+  if (!ac) return;
+  if (ac.state === 'suspended') { try { ac.resume(); } catch (e) {} }
+  audioUnlocked = true;
+}
+document.addEventListener('pointerdown', unlockAudio, { passive: true });
+document.addEventListener('touchstart', unlockAudio, { passive: true });
+
+function sfxTone(freq, dur, vol, type, when) {
+  if (state && state.muted) return;
+  const ac = audioInit();
+  if (!ac) return;
+  const t0 = ac.currentTime + (when || 0);
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.type = type || 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0, t0);
+  gain.gain.linearRampToValueAtTime(vol || 0.12, t0 + 0.006);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(gain);
+  gain.connect(ac.destination);
+  osc.start(t0);
+  osc.stop(t0 + dur + 0.02);
+}
+function sfxArpeggio(freqs, stepSec, dur, vol, type) {
+  for (let i = 0; i < freqs.length; i++) sfxTone(freqs[i], dur, vol, type, i * stepSec);
+}
+function sfxChord(freqs, dur, vol, type) {
+  for (const f of freqs) sfxTone(f, dur, vol, type);
+}
+// Specific SFX
+function sfxMatchPop(depth) { sfxTone(580 + (depth - 1) * 90, 0.11, 0.07, 'sine'); }
+function sfxCascade(depth) {
+  if (depth < 2) return;
+  const base = 440;
+  const notes = [base, base * 1.25, base * 1.5];
+  if (depth >= 4) notes.push(base * 2);
+  sfxArpeggio(notes, 0.065, 0.18, 0.10, 'triangle');
+}
+function sfxMega() {
+  sfxChord([880, 1108, 1318, 1760], 0.65, 0.09, 'sine');
+  sfxArpeggio([1760, 2349, 2637], 0.08, 0.40, 0.06, 'triangle');
+}
+function sfxSwapFail()    { sfxTone(160, 0.09, 0.08, 'sawtooth'); }
+function sfxSwapSuccess() { sfxTone(820, 0.07, 0.06, 'sine'); }
+function sfxCoinChime()   { sfxArpeggio([880, 1175, 1480], 0.04, 0.16, 0.06, 'sine'); }
+function sfxChargeFull()  { sfxArpeggio([523, 659, 784, 1047], 0.06, 0.22, 0.10, 'triangle'); }
+function sfxBoom()        { sfxTone(80, 0.45, 0.16, 'sawtooth'); sfxTone(140, 0.4, 0.12, 'square'); }
+function sfxZap()         { sfxArpeggio([1760, 1480, 2349, 1318], 0.025, 0.12, 0.08, 'sawtooth'); }
+function sfxArrow()       { sfxArpeggio([880, 1480, 1760], 0.04, 0.12, 0.07, 'square'); }
+function sfxBuild()       { sfxArpeggio([523, 659, 784], 0.10, 0.25, 0.10, 'triangle'); }
 
 function easeOut(p)   { return 1 - Math.pow(1 - p, 3); }
 function easeInOut(p) { return p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2; }
@@ -2486,7 +2557,7 @@ function runDetonationSequence(detonations, onAllDone) {
       const cell = grid[det.r][det.c];
       const color = cell ? tileParticleColor(cell.type) : '#ffd864';
       if (det.sp === SP_ARROW_H) {
-        shake(8, 350); haptic('heavy');
+        shake(8, 350); haptic('heavy'); sfxArrow();
         startFXAnim('arrow_h', { epicenter: { r: det.r, c: det.c }, color }, finish);
         for (let cc = 0; cc < COLS; cc++) {
           const passDelay = Math.abs(cc - det.c) * 35;
@@ -2496,7 +2567,7 @@ function runDetonationSequence(detonations, onAllDone) {
           }, passDelay);
         }
       } else if (det.sp === SP_ARROW_V) {
-        shake(8, 350); haptic('heavy');
+        shake(8, 350); haptic('heavy'); sfxArrow();
         startFXAnim('arrow_v', { epicenter: { r: det.r, c: det.c }, color }, finish);
         for (let rr = 0; rr < ROWS; rr++) {
           const passDelay = Math.abs(rr - det.r) * 35;
@@ -2506,7 +2577,7 @@ function runDetonationSequence(detonations, onAllDone) {
           }, passDelay);
         }
       } else if (det.sp === SP_BOMB) {
-        shake(14, 500); haptic('success');
+        shake(14, 500); haptic('success'); sfxBoom();
         startFXAnim('bomb_blast', { epicenter: { r: det.r, c: det.c }, cells: det.cells, color }, finish);
         for (const key of det.cells) {
           const [rr, cc] = key.split(',').map(Number);
@@ -2517,7 +2588,7 @@ function runDetonationSequence(detonations, onAllDone) {
           }, dist * 60);
         }
       } else if (det.sp === SP_LIGHTNING) {
-        shake(10, 400); haptic('success');
+        shake(10, 400); haptic('success'); sfxZap();
         const targets = [];
         for (const key of det.cells) {
           const [rr, cc] = key.split(',').map(Number);
@@ -2758,7 +2829,7 @@ function attemptSwap(r1, c1, r2, c2) {
   if (!willMatch && !detonateOnly) {
     // Revert and bounce-back
     grid[r1][c1] = a; grid[r2][c2] = b;
-    haptic('err');
+    haptic('err'); sfxSwapFail();
     game.busy = true;
     grid[r1][c1] = b; grid[r2][c2] = a;
     startSwapAnim(r1, c1, r2, c2, () => {
@@ -2786,6 +2857,7 @@ function attemptSwap(r1, c1, r2, c2) {
 
   // Animate swap (grid already in post-swap state), then resolve cascade.
   game.busy = true;
+  sfxSwapSuccess();
   const swapCells = new Set([r1 + ',' + c1, r2 + ',' + c2]);
   startSwapAnim(r1, c1, r2, c2, () => {
     game.cascadeDepth = 0; game.cascadeMax = 0;
@@ -2823,7 +2895,7 @@ function processCascadeStep(seedMatched, swapCells) {
     if (state.meter.shield >= METER_CAP) {
       state.shieldsStocked = Math.min(3, state.shieldsStocked + 1);
       state.meter.shield = 0;
-      toast(t('shield_ok')); haptic('success');
+      toast(t('shield_ok')); haptic('success'); sfxChargeFull();
     }
     if (!hasPossibleMove()) {
       toast(t('no_more_moves'));
@@ -2932,12 +3004,14 @@ function scoreMatchedCells(cells) {
     state.meter.pig    = Math.min(METER_CAP, state.meter.pig    + burst);
     state.meter.shield = Math.min(METER_CAP, state.meter.shield + burst);
   }
+  sfxMatchPop(game.cascadeDepth);
   if (game.cascadeDepth === 1)      haptic('tap');
-  else if (game.cascadeDepth === 2) haptic('med');
-  else if (game.cascadeDepth === 3) { haptic('heavy'); shake(4, 180); }
+  else if (game.cascadeDepth === 2) { haptic('med');   sfxCascade(2); }
+  else if (game.cascadeDepth === 3) { haptic('heavy'); shake(4, 180); sfxCascade(3); }
   else if (game.cascadeDepth >= 4)  {
     haptic('success'); shake(8, 280);
     flashScreen('rgba(255,216,100,0.35)', 0.4, 260);
+    sfxMega();
     // Confetti rains down for MEGA cascades (depth 4+). 40 paper bits
     // for depth-4, more for deeper chains.
     spawnConfetti(30 + game.cascadeDepth * 8);
@@ -4478,7 +4552,7 @@ function buildStructure(id) {
   if (state.coins < cost) { toast(t('not_enough_coins')); haptic('err'); return; }
   state.coins -= cost;
   state.village[id] = lvl + 1;
-  haptic('success');
+  haptic('success'); sfxBuild();
   saveState();
   refreshAllUI();
   let levels = 0, max = 0;
@@ -4763,6 +4837,7 @@ function claimDaily() {
   state.dailyChestYMD = todayYMD();
   state.dailyChestDay = next;
   haptic('success');
+  sfxCoinChime();
   bumpScore();
   saveState();
   refreshAllUI();
@@ -4786,12 +4861,26 @@ function showWelcomeModal() {
 }
 
 function showSettingsModal() {
+  const muteLbl = state.muted ? (state.lang === 'ru' ? 'Звук: ВЫКЛ' : 'Sound: OFF')
+                              : (state.lang === 'ru' ? 'Звук: ВКЛ' : 'Sound: ON');
   const html =
     '<h2>' + t('settings') + '</h2>' +
-    '<div style="font-size:12px;color:#c7cdd9;margin-bottom:6px;letter-spacing:1px;text-transform:uppercase;font-weight:800;">' + t('language') + '</div>' +
+    '<div class="row" style="cursor:pointer;" id="sound-toggle">' +
+      '<div>🔊 ' + (state.lang === 'ru' ? 'Звук' : 'Sound') + '</div>' +
+      '<div style="color:' + (state.muted ? '#ff5c7a' : '#ffd864') + ';font-weight:900;">' + muteLbl.split(': ')[1] + '</div>' +
+    '</div>' +
+    '<div style="font-size:12px;color:#c7cdd9;margin:10px 0 6px;letter-spacing:1px;text-transform:uppercase;font-weight:800;">' + t('language') + '</div>' +
     '<div class="lang-grid" id="lang-grid"></div>' +
     '<div style="text-align:center;font-size:11px;color:#5a4ab0;margin-top:10px;">' + VERSION + '</div>';
   openModal(html);
+  const tgl = document.getElementById('sound-toggle');
+  if (tgl) tgl.addEventListener('click', () => {
+    state.muted = !state.muted;
+    if (!state.muted) sfxCoinChime();  // confirmation ping when turning ON
+    saveState();
+    closeModal();
+    setTimeout(showSettingsModal, 60);
+  });
   const grid = document.getElementById('lang-grid');
   for (const l of LANGS) {
     const cell = document.createElement('div');
