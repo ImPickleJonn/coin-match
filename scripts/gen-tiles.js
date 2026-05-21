@@ -75,13 +75,14 @@ ART STYLE (mandatory — match the reference image exactly):
 - BIG glossy white highlight smear on the upper-left of the subject (round or crescent shape)
 - Cute "alive" feel — slight asymmetry, charming proportions
 
-ABSOLUTELY NO SHADOW (mandatory):
-- NO drop shadow under the subject
-- NO ground shadow
+ABSOLUTELY NO SHADOW (mandatory — this is the most important rule):
+- NO drop shadow under the subject (zero, none, gone)
+- NO ground shadow ellipse beneath the subject
 - NO cast shadow of any kind on the background
 - NO ground plane, NO floor, NO platform under the subject
+- The subject must FLOAT against the background with no shadow whatsoever
 - The image must contain ONLY two things: (1) the subject silhouette,
-  (2) the pure-black background. Nothing else.
+  (2) the pure-black background. Nothing else. No third element. No shadow.
 
 COMPOSITION (mandatory):
 - ONE subject, dead-centered
@@ -238,16 +239,33 @@ function autoCropAndCenter(width, height, data, targetFill, alphaCutoff) {
 // outline doesn't carry a halo of dark fringe. -----
 function stripBlackBackground(imgBuffer) {
   const { width: w, height: h, data } = decodeToRGBA(imgBuffer);
-  // The flood-fill from the edges eats two kinds of pixels:
-  //   (a) pitch black or near-black (sum of R+G+B < 70) — the prompt-mandated bg
-  //   (b) gray-ish pixels at mid luminance — Gemini's residual drop shadow
-  //       (chocolate-brown outline is NOT gray: R=58, G=26, B=5 has max-min=53,
-  //        well above the gray cutoff, so the outline stops the flood as expected)
+  // Even though the prompt asks for pitch-black bg, Gemini sometimes
+  // outputs white or off-white instead. Sample the four corners and
+  // use the median color as the actual background reference. Then
+  // flood-fill from edges through any pixel within DIST of that color
+  // OR any gray-ish pixel at mid luminance (residual drop shadows).
+  const cornerSamples = [
+    [0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1],
+    [10, 10], [w - 11, 10], [10, h - 11], [w - 11, h - 11],
+  ];
+  let bgR = 0, bgG = 0, bgB = 0;
+  for (const [x, y] of cornerSamples) {
+    const i = (y * w + x) * 4;
+    bgR += data[i]; bgG += data[i + 1]; bgB += data[i + 2];
+  }
+  bgR /= cornerSamples.length;
+  bgG /= cornerSamples.length;
+  bgB /= cornerSamples.length;
+  const COLOR_DIST_SQ = 90 * 90;   // squared color distance (R+G+B space)
   function isBackgroundPixel(r, g, b) {
-    if (r + g + b < 70) return true;                    // pure black
+    const dr = r - bgR, dg = g - bgG, db = b - bgB;
+    if (dr * dr + dg * dg + db * db < COLOR_DIST_SQ) return true;
+    // Also eat gray-ish pixels at mid luminance (drop shadows on light bg).
+    // Chocolate-brown outline (R=58,G=26,B=5) has max-min=53, NOT gray — safe.
+    // White highlights (~255,255,255) have sum >= 720 — also safe (sum<540 cap).
     const maxC = Math.max(r, g, b);
     const minC = Math.min(r, g, b);
-    if (maxC - minC <= 22 && (r + g + b) < 540) return true;  // gray shadow
+    if (maxC - minC <= 22 && (r + g + b) < 540) return true;
     return false;
   }
   const visited = new Uint8Array(w * h);
