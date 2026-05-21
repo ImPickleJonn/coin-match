@@ -2889,6 +2889,7 @@ function scoreMatchedCells(cells) {
   let stepCoins = 0;
   const chargeAdd = { hammer: 0, pig: 0, shield: 0 };
   let starCount = 0;
+  let orbCount = 0;
   for (const key of cells) {
     const [r, c] = key.split(',').map(Number);
     const cell = grid[r][c];
@@ -2902,8 +2903,15 @@ function scoreMatchedCells(cells) {
     spawnScoreFly(c, r, '+' + Math.floor(earn));
     const px = c * CELL + CELL / 2;
     const py = r * CELL + CELL / 2;
-    spawnParticles(px, py, tileParticleColor(type), 12, 1.8);
+    const color = tileParticleColor(type);
+    spawnParticles(px, py, color, 12, 1.8);
     spawnParticles(px, py, '#ffffff', 5, 1.4);
+    // Tile-trail orb — heavier DOM effect, throttled to first 4 cells per
+    // step so big board clears don't choke. Specials always get an orb.
+    if (orbCount < 4 || cell.sp) {
+      spawnTileTrail(c, r, color, orbCount * 35);
+      orbCount++;
+    }
     if (type === TILE.HAMMER)      chargeAdd.hammer++;
     else if (type === TILE.PIG)    chargeAdd.pig++;
     else if (type === TILE.SHIELD) chargeAdd.shield++;
@@ -4160,6 +4168,83 @@ canvas.addEventListener('mouseleave', () => { dragStart = null; isSwiping = fals
    [32] VFX — score-fly, score bump, combo overlay, screen flash
        (Direct port from Match Icon spawnScoreFly / scoreBump.)
    ========================================================= */
+
+// Tile-trail orb — small glowing dot in the tile's color flies from the
+// cleared board cell to the gold counter with 8 fading trail clones
+// behind it. On arrival, spawns a color burst at the score and the
+// score-card bumps. Heavier than spawnScoreFly text but reads as the
+// reward physically arriving. Throttled by callers (first N cells only).
+function spawnTileTrail(col, row, color, delay) {
+  delay = delay || 0;
+  const rect = canvas.getBoundingClientRect();
+  const startX = rect.left + col * CELL + CELL / 2;
+  const startY = rect.top  + row * CELL + CELL / 2;
+  const target = document.getElementById('goldScore');
+  if (!target) return;
+  const trect = target.getBoundingClientRect();
+  const endX = trect.left + trect.width / 2;
+  const endY = trect.top  + trect.height / 2;
+  setTimeout(() => {
+    const orb = document.createElement('div');
+    orb.style.cssText =
+      'position:fixed;left:' + startX + 'px;top:' + startY + 'px;' +
+      'width:16px;height:16px;margin-left:-8px;margin-top:-8px;' +
+      'border-radius:50%;background:' + color + ';' +
+      'box-shadow:0 0 12px ' + color + ',0 0 20px ' + color + ',0 0 4px #fff inset;' +
+      'pointer-events:none;z-index:82;opacity:1;will-change:left,top,transform,opacity;' +
+      'transition:left 0.65s cubic-bezier(0.45,0,0.55,0.2),top 0.65s cubic-bezier(0.45,0,0.55,0.2),transform 0.65s ease-in,opacity 0.15s ease-out 0.55s;';
+    document.body.appendChild(orb);
+    let trailCount = 0;
+    const trailInterval = setInterval(() => {
+      const orbRect = orb.getBoundingClientRect();
+      const tx = orbRect.left + orbRect.width / 2;
+      const ty = orbRect.top  + orbRect.height / 2;
+      const trail = document.createElement('div');
+      trail.style.cssText =
+        'position:fixed;left:' + tx + 'px;top:' + ty + 'px;' +
+        'width:10px;height:10px;margin-left:-5px;margin-top:-5px;' +
+        'border-radius:50%;background:' + color + ';' +
+        'box-shadow:0 0 8px ' + color + ';' +
+        'pointer-events:none;z-index:81;opacity:0.7;will-change:opacity,transform;' +
+        'transition:opacity 0.4s ease-out,transform 0.4s ease-out;';
+      document.body.appendChild(trail);
+      requestAnimationFrame(() => {
+        trail.style.opacity = '0';
+        trail.style.transform = 'scale(0.3)';
+      });
+      setTimeout(() => { if (trail.parentNode) trail.remove(); }, 450);
+      trailCount++;
+      if (trailCount >= 8) clearInterval(trailInterval);
+    }, 55);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        orb.style.left = endX + 'px';
+        orb.style.top  = endY + 'px';
+        orb.style.transform = 'scale(0.4)';
+        orb.style.opacity = '0';
+      });
+    });
+    setTimeout(() => {
+      clearInterval(trailInterval);
+      // Color burst at the score-card on arrival
+      const burst = document.createElement('div');
+      burst.style.cssText =
+        'position:fixed;left:' + endX + 'px;top:' + endY + 'px;' +
+        'width:30px;height:30px;margin-left:-15px;margin-top:-15px;' +
+        'border-radius:50%;pointer-events:none;z-index:79;opacity:1;' +
+        'background:radial-gradient(circle,' + color + ' 0%,' + color + '88 40%,transparent 70%);' +
+        'transition:opacity 0.3s,transform 0.3s;will-change:opacity,transform;';
+      document.body.appendChild(burst);
+      requestAnimationFrame(() => {
+        burst.style.transform = 'scale(2.2)';
+        burst.style.opacity = '0';
+      });
+      setTimeout(() => { if (burst.parentNode) burst.remove(); }, 320);
+      bumpScore();
+    }, 650);
+    setTimeout(() => { if (orb.parentNode) orb.remove(); }, 750);
+  }, delay);
+}
 
 function spawnScoreFly(col, row, text) {
   const rect = canvas.getBoundingClientRect();
