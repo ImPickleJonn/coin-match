@@ -73,11 +73,18 @@ ART STYLE (mandatory — match the reference image exactly):
 - Thick chocolate-brown outline (~6% of canvas width) around every silhouette, color #3a1a05
 - Candy-color gradient fill — saturated, bright, glossy
 - BIG glossy white highlight smear on the upper-left of the subject (round or crescent shape)
-- Soft drop shadow under the subject (small, only directly beneath)
 - Cute "alive" feel — slight asymmetry, charming proportions
 
+ABSOLUTELY NO SHADOW (mandatory):
+- NO drop shadow under the subject
+- NO ground shadow
+- NO cast shadow of any kind on the background
+- NO ground plane, NO floor, NO platform under the subject
+- The image must contain ONLY two things: (1) the subject silhouette,
+  (2) the pure-black background. Nothing else.
+
 COMPOSITION (mandatory):
-- One subject, dead-centered, filling ~80% of the canvas
+- ONE subject, dead-centered
 - BACKGROUND MUST BE 100% SOLID PITCH BLACK (#000000) — completely flat, no gradient,
   no texture, no scene, no highlight, no soft transparent edges. JUST PURE BLACK.
 - The chocolate-brown outline of the subject must be a clearly DIFFERENT shade from
@@ -155,6 +162,75 @@ function encodeRGBAToPNG(width, height, data) {
   return PNG.sync.write(png);
 }
 
+// ----- Auto-crop the opaque subject, scale it so the LONGER dimension
+// fills `targetFill` of the canvas, and center it on a fresh transparent
+// square. This guarantees every tile occupies the same visual size on
+// the game board, regardless of whether the source was tall (chicken
+// with comb) or wide (chest) or thin (lightning bolt). Uses bilinear
+// sampling for smooth scaling.
+function autoCropAndCenter(width, height, data, targetFill, alphaCutoff) {
+  if (targetFill == null) targetFill = 0.86;
+  if (alphaCutoff == null) alphaCutoff = 12;
+  // Find bounding box of opaque pixels
+  let minX = width, minY = height, maxX = -1, maxY = -1;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const a = data[(y * width + x) * 4 + 3];
+      if (a > alphaCutoff) {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (maxX < 0) return data; // empty image, nothing to do
+  const bboxW = maxX - minX + 1;
+  const bboxH = maxY - minY + 1;
+  const longer = Math.max(bboxW, bboxH);
+  const targetSize = width * targetFill;
+  const scale = targetSize / longer;
+  const scaledW = Math.round(bboxW * scale);
+  const scaledH = Math.round(bboxH * scale);
+  const offsetX = Math.round((width - scaledW) / 2);
+  const offsetY = Math.round((height - scaledH) / 2);
+  // Fresh transparent output buffer (alloc zero-fills)
+  const out = Buffer.alloc(width * height * 4);
+  // Bilinear sample from src bbox into dst region
+  const srcStride = width * 4;
+  for (let y = 0; y < scaledH; y++) {
+    const srcY = minY + (y + 0.5) / scale - 0.5;
+    const sy0 = Math.max(0, Math.min(height - 1, Math.floor(srcY)));
+    const sy1 = Math.max(0, Math.min(height - 1, sy0 + 1));
+    const ty = srcY - sy0;
+    const otY = offsetY + y;
+    if (otY < 0 || otY >= height) continue;
+    for (let x = 0; x < scaledW; x++) {
+      const srcX = minX + (x + 0.5) / scale - 0.5;
+      const sx0 = Math.max(0, Math.min(width - 1, Math.floor(srcX)));
+      const sx1 = Math.max(0, Math.min(width - 1, sx0 + 1));
+      const tx = srcX - sx0;
+      const otX = offsetX + x;
+      if (otX < 0 || otX >= width) continue;
+      const i00 = sy0 * srcStride + sx0 * 4;
+      const i01 = sy0 * srcStride + sx1 * 4;
+      const i10 = sy1 * srcStride + sx0 * 4;
+      const i11 = sy1 * srcStride + sx1 * 4;
+      const di = otY * srcStride + otX * 4;
+      for (let c = 0; c < 4; c++) {
+        const v00 = data[i00 + c];
+        const v01 = data[i01 + c];
+        const v10 = data[i10 + c];
+        const v11 = data[i11 + c];
+        const top = v00 * (1 - tx) + v01 * tx;
+        const bot = v10 * (1 - tx) + v11 * tx;
+        out[di + c] = Math.round(top * (1 - ty) + bot * ty);
+      }
+    }
+  }
+  return out;
+}
+
 // ----- Chroma-key: flood-fill from every edge pixel, mark near-black
 // pixels (sum-of-RGB < THRESHOLD) as fully transparent. Robust against
 // any dark detail INSIDE the icon because only edge-connected black is
@@ -162,7 +238,18 @@ function encodeRGBAToPNG(width, height, data) {
 // outline doesn't carry a halo of dark fringe. -----
 function stripBlackBackground(imgBuffer) {
   const { width: w, height: h, data } = decodeToRGBA(imgBuffer);
-  const THRESHOLD = 60;            // sum of R+G+B (out of 765). Pitch black ~ 0; outline brown ~ 105+.
+  // The flood-fill from the edges eats two kinds of pixels:
+  //   (a) pitch black or near-black (sum of R+G+B < 70) — the prompt-mandated bg
+  //   (b) gray-ish pixels at mid luminance — Gemini's residual drop shadow
+  //       (chocolate-brown outline is NOT gray: R=58, G=26, B=5 has max-min=53,
+  //        well above the gray cutoff, so the outline stops the flood as expected)
+  function isBackgroundPixel(r, g, b) {
+    if (r + g + b < 70) return true;                    // pure black
+    const maxC = Math.max(r, g, b);
+    const minC = Math.min(r, g, b);
+    if (maxC - minC <= 22 && (r + g + b) < 540) return true;  // gray shadow
+    return false;
+  }
   const visited = new Uint8Array(w * h);
   const stack = [];
   // Seed: every pixel on the four edges
@@ -181,7 +268,7 @@ function stripBlackBackground(imgBuffer) {
     const idx = py * w + px;
     if (visited[idx]) continue;
     const di = idx * 4;
-    if ((data[di] + data[di + 1] + data[di + 2]) >= THRESHOLD) continue;
+    if (!isBackgroundPixel(data[di], data[di + 1], data[di + 2])) continue;
     visited[idx] = 1;
     data[di + 3] = 0;              // alpha = 0
     stack.push(px + 1, py);
@@ -214,7 +301,11 @@ function stripBlackBackground(imgBuffer) {
       }
     }
   }
-  return encodeRGBAToPNG(w, h, data);
+  // Final pass: auto-crop to the opaque content and re-center so every
+  // tile occupies the same visual fraction of the sprite, no matter
+  // whether the source subject was tall, wide, or thin.
+  const cropped = autoCropAndCenter(w, h, data, 0.86, 12);
+  return encodeRGBAToPNG(w, h, cropped);
 }
 
 // ----- Generation request -----
