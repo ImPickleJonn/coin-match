@@ -20,6 +20,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const { PNG } = require('pngjs');
+const jpeg = require('jpeg-js');
 
 // ----- Load API key from .env.local (no dotenv dep needed) -----
 function loadEnvLocal() {
@@ -59,6 +61,10 @@ function loadReferenceBase64() {
 }
 
 // ----- Shared style preamble (the anchor that keeps all 7 tiles consistent) -----
+// IMPORTANT: we ask for SOLID PITCH-BLACK background (#000000), not transparent.
+// Gemini does transparency poorly — semi-transparent halo around the silhouette,
+// fringing on the outline. With a solid black bg we get clean edges, then we
+// chroma-key the black out ourselves via flood-fill (see stripBlackBackground).
 const STYLE_PREAMBLE = `
 Create a SINGLE GAME TILE ICON for a mobile match-3 puzzle game in this EXACT art style (see reference image attached):
 
@@ -67,12 +73,16 @@ ART STYLE (mandatory — match the reference image exactly):
 - Thick chocolate-brown outline (~6% of canvas width) around every silhouette, color #3a1a05
 - Candy-color gradient fill — saturated, bright, glossy
 - BIG glossy white highlight smear on the upper-left of the subject (round or crescent shape)
-- Soft drop shadow under the subject
+- Soft drop shadow under the subject (small, only directly beneath)
 - Cute "alive" feel — slight asymmetry, charming proportions
 
 COMPOSITION (mandatory):
 - One subject, dead-centered, filling ~80% of the canvas
-- TRANSPARENT background (no scene, no environment, no colored backdrop)
+- BACKGROUND MUST BE 100% SOLID PITCH BLACK (#000000) — completely flat, no gradient,
+  no texture, no scene, no highlight, no soft transparent edges. JUST PURE BLACK.
+- The chocolate-brown outline of the subject must be a clearly DIFFERENT shade from
+  the black background — keep the outline at #3a1a05 / dark brown, NOT pitch black,
+  so there's a visible edge between subject and background.
 - Square 1024×1024
 - The icon should read clearly even when scaled down to 64×64 — favor bold shapes over fine detail
 - NO TEXT anywhere on the icon (no labels, no captions, no watermarks)
@@ -120,6 +130,93 @@ const TILES = [
   },
 ];
 
+// ----- Decode any incoming image to RGBA pixel data + width/height.
+// Handles both PNG (89504e47...) and JPEG (ffd8ff...). JPEGs are opaque
+// to begin with, so we synthesize an RGBA buffer (alpha=255 everywhere)
+// — chroma-key will write the alpha channel below.
+function decodeToRGBA(buffer) {
+  const sig = buffer.slice(0, 4).toString('hex');
+  if (sig.startsWith('89504e47')) {
+    const png = PNG.sync.read(buffer);
+    return { width: png.width, height: png.height, data: png.data };
+  }
+  if (sig.startsWith('ffd8ff')) {
+    const decoded = jpeg.decode(buffer, { useTArray: true });
+    // jpeg-js returns RGBA with alpha=255 by default. width/height included.
+    return { width: decoded.width, height: decoded.height, data: Buffer.from(decoded.data) };
+  }
+  throw new Error('Unknown image format, sig=' + sig);
+}
+
+// ----- Re-encode RGBA buffer as PNG -----
+function encodeRGBAToPNG(width, height, data) {
+  const png = new PNG({ width, height });
+  png.data = Buffer.from(data);
+  return PNG.sync.write(png);
+}
+
+// ----- Chroma-key: flood-fill from every edge pixel, mark near-black
+// pixels (sum-of-RGB < THRESHOLD) as fully transparent. Robust against
+// any dark detail INSIDE the icon because only edge-connected black is
+// cleared. Then feather any remaining dim pixels at the boundary so the
+// outline doesn't carry a halo of dark fringe. -----
+function stripBlackBackground(imgBuffer) {
+  const { width: w, height: h, data } = decodeToRGBA(imgBuffer);
+  const THRESHOLD = 60;            // sum of R+G+B (out of 765). Pitch black ~ 0; outline brown ~ 105+.
+  const visited = new Uint8Array(w * h);
+  const stack = [];
+  // Seed: every pixel on the four edges
+  for (let x = 0; x < w; x++) {
+    stack.push(x, 0);
+    stack.push(x, h - 1);
+  }
+  for (let y = 0; y < h; y++) {
+    stack.push(0, y);
+    stack.push(w - 1, y);
+  }
+  while (stack.length) {
+    const py = stack.pop();
+    const px = stack.pop();
+    if (px < 0 || py < 0 || px >= w || py >= h) continue;
+    const idx = py * w + px;
+    if (visited[idx]) continue;
+    const di = idx * 4;
+    if ((data[di] + data[di + 1] + data[di + 2]) >= THRESHOLD) continue;
+    visited[idx] = 1;
+    data[di + 3] = 0;              // alpha = 0
+    stack.push(px + 1, py);
+    stack.push(px - 1, py);
+    stack.push(px, py + 1);
+    stack.push(px, py - 1);
+  }
+  // Edge feather: for any pixel still opaque but very dim AND adjacent
+  // to a now-transparent pixel, scale its alpha by luminance. Smooths
+  // the contour without eating into the chocolate-brown outline.
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const idx = y * w + x;
+      const di = idx * 4;
+      if (data[di + 3] === 0) continue;
+      const lum = data[di] + data[di + 1] + data[di + 2];
+      if (lum >= 140) continue;     // outline pixels (~105+) and brighter stay solid
+      // Check 4-neighbors
+      let touchesTransparent = false;
+      for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const ndi = (ny * w + nx) * 4;
+        if (data[ndi + 3] === 0) { touchesTransparent = true; break; }
+      }
+      if (touchesTransparent) {
+        // Scale alpha proportional to brightness (dim → more transparent)
+        const t = Math.min(1, lum / 140);
+        data[di + 3] = Math.floor(data[di + 3] * t);
+      }
+    }
+  }
+  return encodeRGBAToPNG(w, h, data);
+}
+
 // ----- Generation request -----
 async function generateTile(tile, referenceImg) {
   const prompt = STYLE_PREAMBLE + ' ' + tile.subject;
@@ -157,7 +254,8 @@ async function generateTile(tile, referenceImg) {
     for (const part of parts) {
       const inline = part.inline_data || part.inlineData;
       if (inline && inline.data) {
-        return Buffer.from(inline.data, 'base64');
+        const buf = Buffer.from(inline.data, 'base64');
+        return { buf, mime: inline.mime_type || inline.mimeType || 'image/png' };
       }
     }
   }
@@ -186,11 +284,21 @@ async function main() {
     process.stdout.write(`[${tile.id.padEnd(8)}] generating... `);
     const t0 = Date.now();
     try {
-      const png = await generateTile(tile, referenceImg);
+      const { buf: rawImg, mime } = await generateTile(tile, referenceImg);
       const out = path.join(outDir, tile.filename);
-      fs.writeFileSync(out, png);
+      const sig = rawImg.slice(0, 4).toString('hex');
+      let saved;
+      try {
+        // decodeToRGBA handles both PNG and JPEG. stripBlackBackground
+        // chroma-keys and returns a fresh PNG with proper alpha.
+        saved = stripBlackBackground(rawImg);
+      } catch (e) {
+        console.log(`  (chroma-key failed sig=${sig} mime=${mime}: ${e.message}; saving raw)`);
+        saved = rawImg;
+      }
+      fs.writeFileSync(out, saved);
       const ms = Date.now() - t0;
-      console.log(`ok (${(png.length / 1024).toFixed(0)} KB, ${ms}ms) -> ${tile.filename}`);
+      console.log(`ok (raw ${(rawImg.length / 1024).toFixed(0)}KB ${sig} -> clean ${(saved.length / 1024).toFixed(0)}KB, ${ms}ms) -> ${tile.filename}`);
     } catch (err) {
       console.log(`FAIL: ${err.message}`);
     }
