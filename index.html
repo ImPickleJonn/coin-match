@@ -718,6 +718,238 @@ canvas {
   color: #c7cdd9;
 }
 
+/* =========================================================
+   Village SCENE — an actual island (sky / sea / sand) with
+   buildings placed at fixed % coords. Replaces the old
+   struct-card list (which read like a settings menu).
+   ========================================================= */
+.scene {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  max-height: 60vh;
+  min-height: 280px;
+  background:
+    radial-gradient(circle at 80% 14%, rgba(255,230,140,0.55) 0%, transparent 22%),
+    linear-gradient(to bottom,
+      #7ecbff 0%,
+      #b3e4ff 30%,
+      #5fb2e8 35%,
+      #2d7fd6 50%,
+      #2d7fd6 55%,
+      #f5d896 56%,
+      #e8c476 78%,
+      #d4a96b 100%);
+  border-radius: 18px;
+  overflow: hidden;
+  border: 2px solid #5b3a8a;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.45),
+              inset 0 0 0 2px rgba(255,255,255,0.06);
+  margin-bottom: 14px;
+}
+.scene .sun {
+  position: absolute; top: 6%; right: 8%;
+  font-size: 30px;
+  filter: drop-shadow(0 0 10px rgba(255,220,120,0.8));
+  animation: sunPulse 4s ease-in-out infinite;
+}
+@keyframes sunPulse {
+  0%, 100% { filter: drop-shadow(0 0 8px rgba(255,220,120,0.7)); }
+  50%      { filter: drop-shadow(0 0 16px rgba(255,220,120,0.95)); }
+}
+.scene .cloud {
+  position: absolute;
+  font-size: 22px;
+  color: rgba(255,255,255,0.9);
+  opacity: 0.85;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,0.15));
+  pointer-events: none;
+}
+.scene .cloud-a { top: 8%; left: -25%; animation: cloudDriftA 80s linear infinite; }
+.scene .cloud-b { top: 18%; left: 110%; animation: cloudDriftB 100s linear infinite; }
+@keyframes cloudDriftA {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(170vw); }
+}
+@keyframes cloudDriftB {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-200vw); }
+}
+.scene .waves {
+  position: absolute;
+  top: 52%; left: -10%;
+  width: 130%;
+  height: 6px;
+  background:
+    repeating-linear-gradient(90deg,
+      rgba(255,255,255,0.7) 0px,
+      rgba(255,255,255,0.7) 4px,
+      transparent 4px,
+      transparent 14px);
+  opacity: 0.45;
+  animation: waveSlide 5s linear infinite;
+  pointer-events: none;
+}
+@keyframes waveSlide {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-18px); }
+}
+.scene .palm {
+  position: absolute;
+  font-size: 38px;
+  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.4));
+  pointer-events: none;
+  transform-origin: 50% 100%;
+  animation: palmSway 6s ease-in-out infinite;
+  z-index: 1;
+}
+.scene .palm-left  { left: 2%;  bottom: 3%; animation-delay: -1s; }
+.scene .palm-right { right: 2%; bottom: 2%; animation-delay: -3s; animation-name: palmSwayRight; }
+@keyframes palmSway {
+  0%, 100% { transform: rotate(-3deg); }
+  50%      { transform: rotate(3deg); }
+}
+@keyframes palmSwayRight {
+  0%, 100% { transform: scaleX(-1) rotate(-3deg); }
+  50%      { transform: scaleX(-1) rotate(3deg); }
+}
+/* Building plot at fixed % coords on the scene */
+.bld {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  display: flex; flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  z-index: 2;
+}
+.bld:active .bld-art { transform: scale(0.92); }
+.bld-art {
+  font-size: 34px;
+  line-height: 1;
+  filter: drop-shadow(0 3px 4px rgba(0,0,0,0.5));
+  transition: font-size 250ms cubic-bezier(0.34, 1.56, 0.64, 1),
+              filter 220ms,
+              transform 120ms;
+}
+.bld.lvl-0 .bld-art {
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px dashed rgba(255,255,255,0.7);
+  background: rgba(0,0,0,0.18);
+  border-radius: 9px;
+  font-size: 22px;
+  font-weight: 900;
+  color: rgba(255,255,255,0.85);
+  filter: none;
+}
+.bld.lvl-1 .bld-art { font-size: 30px; }
+.bld.lvl-2 .bld-art { font-size: 38px; }
+.bld.lvl-3 .bld-art { font-size: 46px; }
+.bld.lvl-4 .bld-art {
+  font-size: 54px;
+  filter: drop-shadow(0 3px 4px rgba(0,0,0,0.5)) drop-shadow(0 0 6px rgba(255,216,100,0.55));
+}
+.bld.lvl-5 .bld-art {
+  font-size: 60px;
+  filter: drop-shadow(0 3px 4px rgba(0,0,0,0.5)) drop-shadow(0 0 14px rgba(255,216,100,0.9));
+  animation: maxedFloat 2.5s ease-in-out infinite;
+}
+@keyframes maxedFloat {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+.bld-tag {
+  margin-top: 3px;
+  display: inline-flex; align-items: center; gap: 4px;
+  background: rgba(0,0,0,0.65);
+  color: #fff;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  border: 1px solid rgba(255,255,255,0.25);
+}
+.bld.lvl-0 .bld-tag {
+  background: linear-gradient(135deg, #ffd864, #ffaa28);
+  color: #2a1a04;
+  border-color: #fff;
+}
+.bld.lvl-5 .bld-tag {
+  background: linear-gradient(135deg, #c9921a, #ffd864);
+  color: #2a1a04;
+  border-color: #fff;
+}
+.bld-tag .stars {
+  color: #ffd864;
+  letter-spacing: 1px;
+  font-size: 9px;
+}
+.bld.lvl-0 .bld-tag .stars,
+.bld.lvl-5 .bld-tag .stars { color: #2a1a04; }
+/* Pulsing green dot when the user can afford the next upgrade */
+.bld.can-afford::after {
+  content: '';
+  position: absolute;
+  top: -6px; right: 2px;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: #4ad88a;
+  border: 2px solid #fff;
+  box-shadow: 0 0 6px #4ad88a;
+  animation: affordPulse 1.4s ease-in-out infinite;
+}
+@keyframes affordPulse {
+  0%, 100% { transform: scale(1);   opacity: 1; }
+  50%      { transform: scale(1.4); opacity: 0.7; }
+}
+/* Upgrade preview popup (shown when a building is tapped) */
+.upgrade-pop { text-align: center; max-width: 280px; }
+.upgrade-pop .u-art {
+  font-size: 80px;
+  line-height: 1;
+  margin: 4px 0 8px;
+  filter: drop-shadow(0 5px 10px rgba(0,0,0,0.55));
+}
+.upgrade-pop .u-name {
+  font-size: 18px;
+  font-weight: 900;
+  color: #fff;
+  margin-bottom: 4px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+.upgrade-pop .u-lvl {
+  font-size: 11px;
+  color: #c7cdd9;
+  margin-bottom: 10px;
+}
+.upgrade-pop .u-lvl .stars {
+  color: #ffd864;
+  letter-spacing: 2px;
+  font-size: 14px;
+  margin-left: 4px;
+}
+.upgrade-pop .u-cost {
+  background: linear-gradient(135deg, #c9921a, #ffd864);
+  color: #2a1a04;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 900;
+  display: inline-block;
+  margin-bottom: 10px;
+  border: 2px solid #fff4ad;
+  box-shadow: 0 3px 0 #6f4d05;
+}
+.upgrade-pop .u-cost.cannot {
+  background: linear-gradient(135deg, #777, #999);
+  border-color: #bbb;
+  box-shadow: 0 3px 0 #444;
+  color: #2a2a2a;
+}
+
+/* Legacy struct-card kept for back-compat (unused now). */
 .struct-card {
   background: linear-gradient(180deg, #2a1f50 0%, #1a1230 100%);
   border: 2px solid #5b3a8a;
@@ -1276,7 +1508,15 @@ canvas {
         <span id="vp-text">0 / 25</span>
       </div>
     </div>
-    <div id="struct-list"></div>
+    <div class="scene" id="village-scene">
+      <div class="sun">☀️</div>
+      <div class="cloud cloud-a">☁️</div>
+      <div class="cloud cloud-b">☁️</div>
+      <div class="waves"></div>
+      <div class="palm palm-left">🌴</div>
+      <div class="palm palm-right">🌴</div>
+      <div id="scene-buildings"></div>
+    </div>
   </div>
 </div>
 
@@ -1344,6 +1584,9 @@ const TILE = {
 };
 
 // Theme — Pirate Cove default. Tile palette: 5 treasure tiles.
+// Each structure has a layout (x%, y%) for its position on the scene.
+// Coordinates are in % of the scene width/height; the anchor is the
+// BOTTOM CENTER of the building (transform: translate(-50%, -100%)).
 const THEMES = {
   pirate: {
     id: 'pirate',
@@ -1351,11 +1594,11 @@ const THEMES = {
     nameEmoji: '🏴‍☠️',
     tiles: ['💎', '⚓', '🗡️', '💀', '🪙'],
     structures: [
-      { id: 'lighthouse', emoji: '🗼', name: 'Lighthouse',     base: 150 },
-      { id: 'tavern',     emoji: '🏠', name: 'Tavern',         base: 250 },
-      { id: 'dock',       emoji: '⛵', name: 'Pirate Dock',    base: 400 },
-      { id: 'cabin',      emoji: '🛖', name: "Captain's Cabin", base: 700 },
-      { id: 'treasure',   emoji: '💰', name: 'Treasure Pile',  base: 1100 },
+      { id: 'lighthouse', emoji: '🗼', name: 'Lighthouse',     base: 150,  x: 18, y: 64 },
+      { id: 'dock',       emoji: '⛵', name: 'Pirate Dock',    base: 400,  x: 36, y: 56 },
+      { id: 'tavern',     emoji: '🏠', name: 'Tavern',         base: 250,  x: 50, y: 80 },
+      { id: 'cabin',      emoji: '🛖', name: "Captain's Cabin", base: 700, x: 68, y: 72 },
+      { id: 'treasure',   emoji: '💰', name: 'Treasure Pile',  base: 1100, x: 84, y: 92 },
     ],
   },
 };
@@ -4530,33 +4773,70 @@ function refreshVillageScreen() {
   if (vpf) vpf.style.width = (levels / max * 100) + '%';
   const vpt = document.getElementById('vp-text');
   if (vpt) vpt.textContent = levels + ' / ' + max;
-  const list = document.getElementById('struct-list');
-  if (!list) return;
-  list.innerHTML = '';
+  // Render buildings as absolutely-positioned plots on the scene.
+  const wrap = document.getElementById('scene-buildings');
+  if (!wrap) return;
+  wrap.innerHTML = '';
   for (const s of theme.structures) {
     const lvl = getStructLevel(s.id);
     const maxed = lvl >= 5;
     const cost = maxed ? 0 : structureCost(s, lvl + 1);
+    const canAfford = !maxed && state.coins >= cost;
     const stars = '★'.repeat(lvl) + '☆'.repeat(5 - lvl);
-    const card = document.createElement('div');
-    card.className = 'struct-card';
-    const action = maxed
-      ? '<div class="maxed-badge">' + t('maxed') + '</div>'
-      : '<button class="btn gold small" data-build="' + s.id + '">' + (lvl === 0 ? t('build') : t('upgrade')) + '</button>' +
-        '<div class="struct-cost">' + fmtNum(cost) + ' 💰</div>';
-    card.innerHTML =
-      '<div class="struct-icon">' + s.emoji + '</div>' +
-      '<div class="struct-info">' +
-        '<div class="struct-name">' + s.name + '</div>' +
-        '<div class="struct-lvl">' + t('lvl') + ' ' + lvl + ' / 5  <span class="stars">' + stars + '</span></div>' +
-      '</div>' +
-      '<div class="struct-action">' + action + '</div>';
-    list.appendChild(card);
+    const bld = document.createElement('div');
+    bld.className = 'bld lvl-' + lvl + (canAfford ? ' can-afford' : '');
+    bld.style.left = s.x + '%';
+    bld.style.top  = s.y + '%';
+    bld.setAttribute('data-bid', s.id);
+    bld.innerHTML =
+      '<div class="bld-art">' + (lvl === 0 ? '+' : s.emoji) + '</div>' +
+      '<div class="bld-tag">' + (maxed ? 'MAX' : (lvl === 0 ? t('build').toUpperCase() : s.name.split(' ')[0])) +
+        ' <span class="stars">' + stars + '</span></div>';
+    bld.addEventListener('click', () => showUpgradePopup(s.id));
+    wrap.appendChild(bld);
   }
-  list.querySelectorAll('[data-build]').forEach(btn => {
-    btn.addEventListener('click', () => buildStructure(btn.getAttribute('data-build')));
-  });
 }
+
+// Building upgrade popup — shown when player taps a building. Big art,
+// name, current level stars, cost, and BUILD/UPGRADE/MAXED action.
+function showUpgradePopup(id) {
+  const theme = THEMES[state.theme];
+  const s = theme.structures.find(x => x.id === id);
+  if (!s) return;
+  const lvl = getStructLevel(id);
+  const maxed = lvl >= 5;
+  const cost = maxed ? 0 : structureCost(s, lvl + 1);
+  const canAfford = !maxed && state.coins >= cost;
+  const stars = '★'.repeat(lvl) + '☆'.repeat(5 - lvl);
+  const nextLvl = Math.min(5, lvl + 1);
+  const html =
+    '<div class="upgrade-pop">' +
+      '<div class="u-art">' + s.emoji + '</div>' +
+      '<div class="u-name">' + s.name + '</div>' +
+      '<div class="u-lvl">' + t('lvl') + ' ' + lvl + ' → ' + nextLvl +
+        '<span class="stars">' + stars + '</span></div>' +
+      (maxed
+        ? '<div class="maxed-badge">' + t('maxed') + '</div>' +
+          '<div style="margin-top:8px;font-size:11px;color:#8a8ca0;">Complete the island for a bonus!</div>'
+        : '<div class="u-cost' + (canAfford ? '' : ' cannot') + '">' + fmtNum(cost) + ' 💰</div>') +
+      '<div class="actions">' +
+        (maxed
+          ? '<button class="btn ghost" id="up-close">' + t('continue') + '</button>'
+          : (canAfford
+              ? '<button class="btn gold" id="up-build" data-bid="' + id + '">' + (lvl === 0 ? t('build') : t('upgrade')) + '</button>'
+              : '<button class="btn ghost" disabled>' + t('not_enough_coins') + '</button>')) +
+      '</div>' +
+    '</div>';
+  openModal(html);
+  const buildBtn = document.getElementById('up-build');
+  if (buildBtn) buildBtn.addEventListener('click', () => {
+    closeModal();
+    setTimeout(() => buildStructure(id), 120);
+  });
+  const closeBtn = document.getElementById('up-close');
+  if (closeBtn) closeBtn.addEventListener('click', closeModal);
+}
+
 function buildStructure(id) {
   const theme = THEMES[state.theme];
   const s = theme.structures.find(x => x.id === id);
@@ -4568,11 +4848,36 @@ function buildStructure(id) {
   state.coins -= cost;
   state.village[id] = lvl + 1;
   haptic('success'); sfxBuild();
+  // Burst of gold sparkles at the upgraded building's scene location
+  const wrap = document.getElementById('village-scene');
+  if (wrap) {
+    const sceneRect = wrap.getBoundingClientRect();
+    const px = sceneRect.left + sceneRect.width * (s.x / 100);
+    const py = sceneRect.top  + sceneRect.height * (s.y / 100);
+    for (let k = 0; k < 14; k++) {
+      const sp = document.createElement('div');
+      const dx = (Math.random() - 0.5) * 120;
+      const dy = -60 - Math.random() * 100;
+      sp.style.cssText =
+        'position:fixed;left:' + px + 'px;top:' + py + 'px;' +
+        'width:10px;height:10px;margin-left:-5px;margin-top:-5px;' +
+        'border-radius:50%;background:radial-gradient(circle,#fff5b0 0%,#ffd864 60%,#c9921a 100%);' +
+        'box-shadow:0 0 10px #ffd864;pointer-events:none;z-index:138;opacity:1;' +
+        'transition:left 0.9s cubic-bezier(0.2,0.7,0.4,1),top 0.9s ease-out,opacity 0.4s ease-in 0.5s;';
+      document.body.appendChild(sp);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        sp.style.left = (px + dx) + 'px';
+        sp.style.top  = (py + dy + 80) + 'px';
+        sp.style.opacity = '0';
+      }));
+      setTimeout(() => { if (sp.parentNode) sp.remove(); }, 1000);
+    }
+  }
   saveState();
   refreshAllUI();
   let levels = 0, max = 0;
   for (const sd of theme.structures) { levels += getStructLevel(sd.id); max += 5; }
-  if (levels >= max) setTimeout(showIslandCompleteModal, 250);
+  if (levels >= max) setTimeout(showIslandCompleteModal, 350);
 }
 function showIslandCompleteModal() {
   const bonus = 5000;
