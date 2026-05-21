@@ -278,6 +278,28 @@ const SKUS = {
     description: '5 shuffles — reshuffle the board, no energy cost.',
     price: 49, priceUsd: '$0.65', grant: { shuffle: 5 },
   },
+  // Single-piece booster SKUs used when the player taps a booster they
+  // don't own. Direct Telegram Stars purchase, no popup interstitial.
+  hammer_one: {
+    id: 'hammer_one', title: 'Hammer ×1',
+    description: 'One hammer — smash 1 tile.',
+    price: 15, priceUsd: '$0.20', grant: { hammer: 1 },
+  },
+  rocket_one: {
+    id: 'rocket_one', title: 'Rocket ×1',
+    description: 'One rocket — clear the row + column you tap.',
+    price: 25, priceUsd: '$0.33', grant: { rocket: 1 },
+  },
+  bomb_one: {
+    id: 'bomb_one', title: 'Bomb ×1',
+    description: 'One bomb — clear a 3×3 area around your tap.',
+    price: 25, priceUsd: '$0.33', grant: { bomb: 1 },
+  },
+  shuffle_one: {
+    id: 'shuffle_one', title: 'Shuffle ×1',
+    description: 'One shuffle — reshuffle the board, no energy cost.',
+    price: 15, priceUsd: '$0.20', grant: { shuffle: 1 },
+  },
   free_pack: {
     id: 'free_pack', title: 'Free-Spin ×5',
     description: '5 tokens — each grants 5 matches with no energy cost.',
