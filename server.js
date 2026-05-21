@@ -693,7 +693,7 @@ async function sendWelcome(chatId, firstName, lang) {
 
 app.get('/api/diag', async (req, res) => {
   const out = {
-    version: 'v0.1.0',
+    version: 'v0.7.0',
     bot_token_configured: !!BOT_TOKEN,
     bot_username: BOT_USERNAME || null,
     public_url: getPublicUrl() || null,

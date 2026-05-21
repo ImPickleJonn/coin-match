@@ -3046,17 +3046,37 @@ function render() {
     }
   }
 
-  // Booster armed cursor — dashed border to show "armed" state
+  // Booster armed — draw per-tile target reticles so the player sees
+  // exactly which cells can be tapped. Corner brackets on every live
+  // tile, color-coded by booster, pulsing in sync. Plus a tinted dashed
+  // canvas border as the "armed mode" frame.
   if (state.armed.hammer || state.armed.rocket || state.armed.bomb) {
+    let reticleColor, frameColor;
+    if (state.armed.hammer)      { reticleColor = '#ff8c3a'; frameColor = '#ff8c3a'; }
+    else if (state.armed.rocket) { reticleColor = '#4fb2ff'; frameColor = '#4fb2ff'; }
+    else                         { reticleColor = '#ff5c7a'; frameColor = '#ff5c7a'; }
+    const pulse = 0.55 + 0.45 * Math.sin(now() / 200);
+    // Per-tile corner-bracket reticle (skip cells in active anims so we
+    // don't draw a reticle on a tile mid-swap/fall).
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (!grid[r][c]) continue;
+        if (skip.has(r + ',' + c)) continue;
+        drawTargetReticle(c * CELL, r * CELL, reticleColor, pulse);
+      }
+    }
+    // Dashed armed-mode frame around the whole board
     ctx.save();
-    ctx.strokeStyle = '#ffd864';
+    ctx.strokeStyle = hexToRgba(frameColor, 0.6 + 0.4 * Math.sin(now() / 200));
     ctx.lineWidth = 3;
-    ctx.setLineDash([6, 5]);
-    ctx.shadowColor = '#ffd864';
-    ctx.shadowBlur = 10;
+    ctx.setLineDash([8, 6]);
+    ctx.lineDashOffset = -(now() / 40) % 14;
+    ctx.shadowColor = frameColor;
+    ctx.shadowBlur = 12;
     roundRectPath(2, 2, cssW - 4, cssH - 4, 10);
     ctx.stroke();
     ctx.setLineDash([]);
+    ctx.lineDashOffset = 0;
     ctx.restore();
   }
 
@@ -3248,6 +3268,48 @@ function roundedSquare(cx, cy, halfSize, radius) {
     ctx.closePath();
   }
 }
+// Booster target reticle — corner brackets at the 4 corners of a tile
+// with a thin center crosshair. Pulses with the global armed pulse so
+// every tile breathes in sync.
+function drawTargetReticle(x, y, color, pulse) {
+  const cx = x + CELL / 2;
+  const cy = y + CELL / 2;
+  const inset = CELL * 0.10;
+  const len = CELL * 0.22;
+  ctx.save();
+  ctx.strokeStyle = hexToRgba(color, 0.55 + 0.35 * pulse);
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = 'round';
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 8 * pulse;
+  // Top-left
+  ctx.beginPath();
+  ctx.moveTo(x + inset, y + inset + len); ctx.lineTo(x + inset, y + inset); ctx.lineTo(x + inset + len, y + inset);
+  ctx.stroke();
+  // Top-right
+  ctx.beginPath();
+  ctx.moveTo(x + CELL - inset - len, y + inset); ctx.lineTo(x + CELL - inset, y + inset); ctx.lineTo(x + CELL - inset, y + inset + len);
+  ctx.stroke();
+  // Bottom-left
+  ctx.beginPath();
+  ctx.moveTo(x + inset, y + CELL - inset - len); ctx.lineTo(x + inset, y + CELL - inset); ctx.lineTo(x + inset + len, y + CELL - inset);
+  ctx.stroke();
+  // Bottom-right
+  ctx.beginPath();
+  ctx.moveTo(x + CELL - inset - len, y + CELL - inset); ctx.lineTo(x + CELL - inset, y + CELL - inset); ctx.lineTo(x + CELL - inset, y + CELL - inset - len);
+  ctx.stroke();
+  // Tiny center crosshair
+  ctx.strokeStyle = hexToRgba(color, 0.4 + 0.3 * pulse);
+  ctx.lineWidth = 1.5;
+  ctx.shadowBlur = 0;
+  const cr = CELL * 0.06;
+  ctx.beginPath();
+  ctx.moveTo(cx - cr, cy); ctx.lineTo(cx + cr, cy);
+  ctx.moveTo(cx, cy - cr); ctx.lineTo(cx, cy + cr);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function darkenColor(hex) {
   if (!hex || hex[0] !== '#' || hex.length < 7) return '#000000';
   const r = parseInt(hex.slice(1, 3), 16);
