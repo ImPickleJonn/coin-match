@@ -3072,6 +3072,259 @@ if (typeof ResizeObserver !== 'undefined') {
   if (_bw) _ro.observe(_bw);
 }
 
+// =========================================================
+// Custom canvas-drawn tile icons. Each function draws ONE icon
+// centered at (cx, cy) within a `size`-wide square. Used by
+// rebuildEmojiCache to bake offscreen sprites under special
+// keys ('_coin', '_sack', '_chest') so drawEmojiSprite can blit
+// them as if they were emojis.
+// =========================================================
+function drawStarPath(c, cx, cy, points, outerR, innerR) {
+  c.beginPath();
+  for (let i = 0; i < points * 2; i++) {
+    const r = (i % 2 === 0) ? outerR : innerR;
+    const angle = (i / (points * 2)) * Math.PI * 2 - Math.PI / 2;
+    const x = cx + Math.cos(angle) * r;
+    const y = cy + Math.sin(angle) * r;
+    if (i === 0) c.moveTo(x, y);
+    else c.lineTo(x, y);
+  }
+  c.closePath();
+}
+
+// GOLD COIN — flat disc with embossed rim, star emblem, top-left
+// specular highlight. Radial gradient sells the metallic gold.
+function drawCoinIconTo(c, cx, cy, size) {
+  const r = size * 0.45;
+  // Soft drop shadow under the coin
+  c.save();
+  c.fillStyle = 'rgba(0,0,0,0.35)';
+  c.beginPath();
+  c.ellipse(cx, cy + r * 0.9, r * 0.85, r * 0.18, 0, 0, Math.PI * 2);
+  c.fill();
+  c.restore();
+  // Main disc with radial gradient (light center → deep edge)
+  const grad = c.createRadialGradient(cx - r * 0.3, cy - r * 0.35, r * 0.05, cx, cy, r);
+  grad.addColorStop(0,    '#fff8c8');
+  grad.addColorStop(0.3,  '#ffd864');
+  grad.addColorStop(0.7,  '#c9921a');
+  grad.addColorStop(1,    '#6f4d05');
+  c.fillStyle = grad;
+  c.beginPath();
+  c.arc(cx, cy, r, 0, Math.PI * 2);
+  c.fill();
+  // Crisp outer outline
+  c.strokeStyle = '#3a2510';
+  c.lineWidth = Math.max(1.2, r * 0.07);
+  c.stroke();
+  // Inner ring — gives the coin an embossed feel
+  c.strokeStyle = '#8a5c10';
+  c.lineWidth = Math.max(1, r * 0.04);
+  c.beginPath();
+  c.arc(cx, cy, r * 0.78, 0, Math.PI * 2);
+  c.stroke();
+  // 5-pointed star emblem in the middle
+  c.fillStyle = '#7a4f0d';
+  drawStarPath(c, cx, cy, 5, r * 0.42, r * 0.18);
+  c.fill();
+  // Top-left specular highlight (sheen)
+  c.save();
+  c.beginPath();
+  c.arc(cx, cy, r * 0.97, 0, Math.PI * 2);
+  c.clip();
+  const hl = c.createRadialGradient(cx - r * 0.4, cy - r * 0.4, r * 0.05, cx - r * 0.4, cy - r * 0.4, r * 0.55);
+  hl.addColorStop(0,   'rgba(255,255,255,0.9)');
+  hl.addColorStop(0.5, 'rgba(255,255,255,0.25)');
+  hl.addColorStop(1,   'rgba(255,255,255,0)');
+  c.fillStyle = hl;
+  c.fillRect(cx - r, cy - r, r * 2, r * 2);
+  c.restore();
+}
+
+// GOLD SACK — round bulb body, tied drawstring neck, $ sign, sheen.
+function drawSackIconTo(c, cx, cy, size) {
+  const w = size * 0.66;
+  const h = size * 0.80;
+  const top   = cy - h * 0.5;
+  const neckY = top + h * 0.26;
+  // Drop shadow
+  c.save();
+  c.fillStyle = 'rgba(0,0,0,0.35)';
+  c.beginPath();
+  c.ellipse(cx, cy + h * 0.42, w * 0.5, h * 0.06, 0, 0, Math.PI * 2);
+  c.fill();
+  c.restore();
+  // Sack body (gradient L→R for shading)
+  const grad = c.createLinearGradient(cx - w * 0.5, cy, cx + w * 0.5, cy);
+  grad.addColorStop(0,    '#6f4d05');
+  grad.addColorStop(0.25, '#c9921a');
+  grad.addColorStop(0.5,  '#ffd864');
+  grad.addColorStop(0.75, '#c9921a');
+  grad.addColorStop(1,    '#6f4d05');
+  c.fillStyle = grad;
+  c.beginPath();
+  c.moveTo(cx - w * 0.5, cy);
+  c.bezierCurveTo(cx - w * 0.58, cy + h * 0.38, cx + w * 0.58, cy + h * 0.38, cx + w * 0.5, cy);
+  c.bezierCurveTo(cx + w * 0.46, neckY + h * 0.04, cx + w * 0.32, neckY, cx + w * 0.22, neckY);
+  c.lineTo(cx - w * 0.22, neckY);
+  c.bezierCurveTo(cx - w * 0.32, neckY, cx - w * 0.46, neckY + h * 0.04, cx - w * 0.5, cy);
+  c.closePath();
+  c.fill();
+  // Body outline
+  c.strokeStyle = '#3a2510';
+  c.lineWidth = Math.max(1, size * 0.025);
+  c.stroke();
+  // Bunched fabric above the tie — small zigzag
+  c.fillStyle = '#a06b18';
+  c.beginPath();
+  c.moveTo(cx - w * 0.20, top + h * 0.12);
+  c.lineTo(cx - w * 0.08, neckY - h * 0.02);
+  c.lineTo(cx,            top + h * 0.08);
+  c.lineTo(cx + w * 0.08, neckY - h * 0.02);
+  c.lineTo(cx + w * 0.20, top + h * 0.12);
+  c.lineTo(cx + w * 0.22, neckY);
+  c.lineTo(cx - w * 0.22, neckY);
+  c.closePath();
+  c.fill();
+  c.strokeStyle = '#3a2510';
+  c.lineWidth = Math.max(0.8, size * 0.018);
+  c.stroke();
+  // Drawstring band at the neck
+  c.fillStyle = '#3a2008';
+  c.fillRect(cx - w * 0.26, neckY - h * 0.02, w * 0.52, h * 0.06);
+  c.strokeStyle = '#1a0a05';
+  c.lineWidth = Math.max(0.8, size * 0.015);
+  c.strokeRect(cx - w * 0.26, neckY - h * 0.02, w * 0.52, h * 0.06);
+  // Tie loops (two small "knot" arcs)
+  c.fillStyle = '#5a3010';
+  c.beginPath();
+  c.arc(cx - w * 0.05, neckY + h * 0.03, h * 0.04, 0, Math.PI * 2);
+  c.arc(cx + w * 0.05, neckY + h * 0.03, h * 0.04, 0, Math.PI * 2);
+  c.fill();
+  // $ symbol on the front of the sack
+  c.fillStyle = '#3a2510';
+  c.font = 'bold ' + Math.floor(h * 0.36) + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.fillText('$', cx, cy + h * 0.13);
+  // Sheen on left side
+  c.save();
+  c.fillStyle = 'rgba(255,255,255,0.4)';
+  c.beginPath();
+  c.ellipse(cx - w * 0.18, cy + h * 0.08, w * 0.08, h * 0.20, -0.3, 0, Math.PI * 2);
+  c.fill();
+  c.restore();
+}
+
+// GOLD CHEST — wooden box with curved lid, gold band, corner brackets,
+// gold lock plate with keyhole. Top-lit sheen on lid.
+function drawChestIconTo(c, cx, cy, size) {
+  const w = size * 0.82;
+  const h = size * 0.64;
+  const lidY  = cy - h * 0.5;
+  const boxY  = cy + h * 0.02;
+  const bottom = cy + h * 0.46;
+  const r = w * 0.04;
+  // Drop shadow
+  c.save();
+  c.fillStyle = 'rgba(0,0,0,0.4)';
+  c.beginPath();
+  c.ellipse(cx, bottom + h * 0.08, w * 0.48, h * 0.06, 0, 0, Math.PI * 2);
+  c.fill();
+  c.restore();
+  // Box body (wood gradient)
+  const bodyGrad = c.createLinearGradient(cx, boxY, cx, bottom);
+  bodyGrad.addColorStop(0,   '#9a5a28');
+  bodyGrad.addColorStop(0.5, '#6e3e1a');
+  bodyGrad.addColorStop(1,   '#4a2810');
+  c.fillStyle = bodyGrad;
+  c.beginPath();
+  c.moveTo(cx - w * 0.5, boxY);
+  c.lineTo(cx + w * 0.5, boxY);
+  c.lineTo(cx + w * 0.5, bottom - r);
+  c.quadraticCurveTo(cx + w * 0.5, bottom, cx + w * 0.5 - r, bottom);
+  c.lineTo(cx - w * 0.5 + r, bottom);
+  c.quadraticCurveTo(cx - w * 0.5, bottom, cx - w * 0.5, bottom - r);
+  c.closePath();
+  c.fill();
+  c.strokeStyle = '#2a1505';
+  c.lineWidth = Math.max(1, size * 0.025);
+  c.stroke();
+  // Wood plank seams on body (subtle vertical lines)
+  c.strokeStyle = 'rgba(40,20,8,0.45)';
+  c.lineWidth = Math.max(0.6, size * 0.012);
+  for (const t of [-0.25, 0, 0.25]) {
+    c.beginPath();
+    c.moveTo(cx + w * t, boxY + h * 0.05);
+    c.lineTo(cx + w * t, bottom - h * 0.04);
+    c.stroke();
+  }
+  // Curved lid (rounded top)
+  const lidGrad = c.createLinearGradient(cx, lidY, cx, boxY);
+  lidGrad.addColorStop(0,   '#b6753a');
+  lidGrad.addColorStop(0.6, '#8a4f25');
+  lidGrad.addColorStop(1,   '#5a3015');
+  c.fillStyle = lidGrad;
+  c.beginPath();
+  c.moveTo(cx - w * 0.5, boxY);
+  c.quadraticCurveTo(cx - w * 0.5, lidY + h * 0.05, cx - w * 0.42, lidY + h * 0.02);
+  c.quadraticCurveTo(cx, lidY - h * 0.04, cx + w * 0.42, lidY + h * 0.02);
+  c.quadraticCurveTo(cx + w * 0.5, lidY + h * 0.05, cx + w * 0.5, boxY);
+  c.closePath();
+  c.fill();
+  c.strokeStyle = '#2a1505';
+  c.lineWidth = Math.max(1, size * 0.025);
+  c.stroke();
+  // Gold band where lid meets body
+  c.fillStyle = '#ffd864';
+  c.fillRect(cx - w * 0.5, boxY - h * 0.04, w, h * 0.08);
+  c.strokeStyle = '#6f4d05';
+  c.lineWidth = Math.max(0.8, size * 0.018);
+  c.strokeRect(cx - w * 0.5, boxY - h * 0.04, w, h * 0.08);
+  // Gold corner brackets at the bottom corners
+  c.fillStyle = '#ffd864';
+  c.strokeStyle = '#6f4d05';
+  c.lineWidth = Math.max(0.6, size * 0.012);
+  const cs = w * 0.09;
+  c.fillRect(cx - w * 0.5, bottom - cs, cs, cs);
+  c.strokeRect(cx - w * 0.5, bottom - cs, cs, cs);
+  c.fillRect(cx + w * 0.5 - cs, bottom - cs, cs, cs);
+  c.strokeRect(cx + w * 0.5 - cs, bottom - cs, cs, cs);
+  // Gold lock plate in front of body
+  c.fillStyle = '#ffd864';
+  c.beginPath();
+  c.arc(cx, boxY + h * 0.22, h * 0.14, 0, Math.PI * 2);
+  c.fill();
+  c.strokeStyle = '#6f4d05';
+  c.lineWidth = Math.max(0.8, size * 0.02);
+  c.stroke();
+  // Keyhole (dark slot)
+  c.fillStyle = '#1a0a05';
+  c.beginPath();
+  c.arc(cx, boxY + h * 0.20, h * 0.045, 0, Math.PI * 2);
+  c.fill();
+  c.fillRect(cx - h * 0.012, boxY + h * 0.20, h * 0.024, h * 0.08);
+  // Sparkle on the lock for that "treasure" pop
+  c.fillStyle = 'rgba(255,255,255,0.7)';
+  c.beginPath();
+  c.arc(cx - h * 0.05, boxY + h * 0.17, h * 0.025, 0, Math.PI * 2);
+  c.fill();
+  // Lid sheen
+  c.save();
+  c.beginPath();
+  c.moveTo(cx - w * 0.5, boxY);
+  c.quadraticCurveTo(cx - w * 0.5, lidY + h * 0.05, cx - w * 0.42, lidY + h * 0.02);
+  c.quadraticCurveTo(cx, lidY - h * 0.04, cx + w * 0.42, lidY + h * 0.02);
+  c.quadraticCurveTo(cx + w * 0.5, lidY + h * 0.05, cx + w * 0.5, boxY);
+  c.closePath();
+  c.clip();
+  c.fillStyle = 'rgba(255,255,255,0.35)';
+  c.beginPath();
+  c.ellipse(cx - w * 0.2, lidY + h * 0.18, w * 0.24, h * 0.08, -0.2, 0, Math.PI * 2);
+  c.fill();
+  c.restore();
+}
+
 function rebuildEmojiCache(cell) {
   emojiCache = Object.create(null);
   emojiCacheCell = cell;
@@ -3094,6 +3347,23 @@ function rebuildEmojiCache(cell) {
     octx.shadowOffsetY = 2;
     octx.fillText(ch, total / 2, total / 2);
     emojiCache[ch] = { canvas: off, total: total, size: logicalSize };
+  }
+  // Custom-drawn icons cached under special keys. tileEmoji() returns
+  // these keys for COIN/SACK/CHEST so drawEmojiSprite blits the cached
+  // sprites just like any emoji.
+  const CUSTOM = [
+    ['_coin',  drawCoinIconTo],
+    ['_sack',  drawSackIconTo],
+    ['_chest', drawChestIconTo],
+  ];
+  for (const [key, drawFn] of CUSTOM) {
+    const off = document.createElement('canvas');
+    off.width = total * dpr;
+    off.height = total * dpr;
+    const octx = off.getContext('2d');
+    octx.scale(dpr, dpr);
+    drawFn(octx, total / 2, total / 2, logicalSize * 0.95);
+    emojiCache[key] = { canvas: off, total: total, size: logicalSize };
   }
 }
 
@@ -3591,10 +3861,14 @@ function reshuffleGrid() {
 const game = { busy: false, selected: null, cascadeDepth: 0, cascadeMax: 0 };
 
 function tileEmoji(type) {
-  // The THEME tile pulls its emoji from the current theme's themeTileEmoji
-  // so each island has one signature icon (pirate → 💀, desert → 🌵, etc.).
-  // Every other tile (coin/sack/chest/shield/pig/bolt/wild/star) uses the
-  // universal fixed-emoji table.
+  // COIN / SACK / CHEST → custom canvas-drawn icons (cached under special
+  // keys in rebuildEmojiCache). The drawEmojiSprite path treats these the
+  // same as any cached emoji — it blits the offscreen canvas.
+  if (type === TILE.COIN)  return '_coin';
+  if (type === TILE.SACK)  return '_sack';
+  if (type === TILE.CHEST) return '_chest';
+  // THEME pulls its emoji from the current theme's themeTileEmoji so each
+  // island has one signature icon (pirate → 💀, desert → 🌵, etc.).
   if (type === TILE.THEME) {
     const th = THEMES[state.theme];
     return (th && th.themeTileEmoji) || '?';
