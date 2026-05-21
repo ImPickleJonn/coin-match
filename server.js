@@ -584,6 +584,19 @@ app.post('/api/state/save', (req, res) => {
   saveUsers();
   res.json({ ok: true, writes });
 });
+// Hard-reset the caller's saved server state. The client also wipes
+// its localStorage and reloads, so on the next boot /api/state/load
+// returns exists=false and the client starts at defaults.
+app.post('/api/state/reset', (req, res) => {
+  const user = validateInitData((req.body && req.body.initData) || '');
+  if (!user) return res.status(401).json({ error: 'unauthenticated' });
+  if (users[user.id]) {
+    delete users[user.id];
+    saveUsers();
+  }
+  if (userState.has(String(user.id))) userState.delete(String(user.id));
+  res.json({ ok: true });
+});
 
 app.post('/api/admin/whoami', (req, res) => {
   const user = validateInitData((req.body && req.body.initData) || '');
