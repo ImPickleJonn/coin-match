@@ -1864,6 +1864,9 @@ let animations = [];
 let particles = [];
 let lastTickTime = 0;
 let screenShake = { intensity: 0, duration: 0, start: 0 };
+// Displayed gold lerps toward state.coins so the score-card number rolls
+// up smoothly instead of jumping. Updated in tick(); read by refreshGoldUI.
+let displayedGold = 0;
 const now = performance.now.bind(performance);
 
 function easeOut(p)   { return 1 - Math.pow(1 - p, 3); }
@@ -1932,11 +1935,36 @@ function spawnParticles(x, y, color, count, power) {
     });
   }
 }
+// Confetti — rectangular paper bits raining from above the board.
+// Triggered on cascade depth >= 4 to mark MEGA moments.
+function spawnConfetti(count) {
+  count = count || 40;
+  const cw = COLS * CELL;
+  const colors = ['#ff5c7a', '#ffaf3a', '#4ad88a', '#4fb2ff', '#b878ff', '#ffd864', '#ffffff'];
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x: Math.random() * cw,
+      y: -12 - Math.random() * 40,
+      vx: (Math.random() - 0.5) * 4.5,
+      vy: 1.5 + Math.random() * 2.5,
+      life: 1600 + Math.random() * 800,
+      maxLife: 2400,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      size: 4 + Math.random() * 4,
+      gravity: 0.09,
+      rotation: Math.random() * Math.PI * 2,
+      rotVel: (Math.random() - 0.5) * 0.32,
+      isConfetti: true,
+    });
+  }
+}
 function updateParticles(dt) {
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     p.x += p.vx; p.y += p.vy;
-    p.vy += p.gravity; p.vx *= 0.97;
+    p.vy += p.gravity;
+    if (!p.isConfetti) p.vx *= 0.97;
+    if (p.rotation !== undefined) p.rotation += p.rotVel;
     p.life -= dt;
     if (p.twinkle !== undefined) p.twinkle += dt * 0.012;
     if (p.life <= 0) particles.splice(i, 1);
@@ -1945,6 +1973,19 @@ function updateParticles(dt) {
 function drawParticles() {
   for (const p of particles) {
     const a = Math.max(0, p.life / p.maxLife);
+    if (p.isConfetti) {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rotation || 0);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.size / 2, -p.size * 0.4, p.size, p.size * 1.5);
+      // Subtle darker edge for paper look
+      ctx.fillStyle = 'rgba(0,0,0,0.18)';
+      ctx.fillRect(-p.size / 2, p.size * 0.7, p.size, p.size * 0.4);
+      ctx.restore();
+      continue;
+    }
     const twinkle = p.twinkle !== undefined ? (0.65 + 0.35 * Math.sin(p.twinkle)) : 1;
     const finalA = a * twinkle;
     const sz = p.size * (0.6 + a * 0.6);
@@ -1999,6 +2040,23 @@ function spawnSwipeDot(px, py) {
   setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 380);
 }
 
+// Roll the displayed gold counter toward state.coins each frame. Lerps
+// fast enough to feel snappy but slow enough that big payouts visibly
+// tick up. Returns true if the value changed (so we can refresh UI).
+function tickGoldDisplay() {
+  if (displayedGold === state.coins) return false;
+  const diff = state.coins - displayedGold;
+  const adiff = Math.abs(diff);
+  if (adiff < 4) {
+    displayedGold = state.coins;
+  } else {
+    // Step is 14% of diff per frame, minimum 1 per frame so we never stall.
+    const step = Math.max(1, Math.floor(adiff * 0.14));
+    displayedGold += (diff > 0 ? step : -step);
+  }
+  return true;
+}
+
 // Main rAF loop — runs every frame, updates animations + particles + render.
 function tick(t) {
   const tm = t || now();
@@ -2012,6 +2070,8 @@ function tick(t) {
     if (idx >= 0) animations.splice(idx, 1);
     if (a.done) a.done();
   }
+  // Tick the gold ticker and refresh the score-card text if it changed.
+  if (tickGoldDisplay()) refreshGoldDisplay();
   render();
   requestAnimationFrame(tick);
 }
@@ -2867,7 +2927,13 @@ function scoreMatchedCells(cells) {
   if (game.cascadeDepth === 1)      haptic('tap');
   else if (game.cascadeDepth === 2) haptic('med');
   else if (game.cascadeDepth === 3) { haptic('heavy'); shake(4, 180); }
-  else if (game.cascadeDepth >= 4)  { haptic('success'); shake(8, 280); flashScreen('rgba(255,216,100,0.35)', 0.4, 260); }
+  else if (game.cascadeDepth >= 4)  {
+    haptic('success'); shake(8, 280);
+    flashScreen('rgba(255,216,100,0.35)', 0.4, 260);
+    // Confetti rains down for MEGA cascades (depth 4+). 40 paper bits
+    // for depth-4, more for deeper chains.
+    spawnConfetti(30 + game.cascadeDepth * 8);
+  }
   bumpScore();
   refreshGoldUI();
   refreshMetersUI();
@@ -4179,8 +4245,15 @@ function refreshAllUI() {
   refreshMasterBlock();
   refreshVillageScreen();
 }
+// refreshGoldUI() doesn't directly write text — the rAF ticker advances
+// `displayedGold` each frame and calls refreshGoldDisplay() to update DOM.
+// Callers that change state.coins just invoke refreshGoldUI() and the
+// ticker takes over animating to the new value.
 function refreshGoldUI() {
-  const v = fmtNum(state.coins);
+  refreshGoldDisplay();
+}
+function refreshGoldDisplay() {
+  const v = fmtNum(displayedGold);
   const el = document.getElementById('goldScore');
   if (el) el.textContent = v;
   const hud = document.getElementById('hud-coins');
@@ -4737,6 +4810,9 @@ function toast(msg) {
   pruneOldMasterDamage();
   spawnFreshGrid();
   sizeCanvas();
+  // Initialize the ticker to current value so the first frame doesn't roll
+  // from 0 to N (only animate transitions, not the initial load).
+  displayedGold = state.coins;
   refreshAllUI();
   // Kick the main render loop — runs every frame for animations + particles.
   requestAnimationFrame(tick);
