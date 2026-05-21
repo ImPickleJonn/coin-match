@@ -77,7 +77,9 @@ html, body {
   flex-direction: column;
   align-items: center;
   height: 100%;
-  padding: max(4px, var(--tg-safe-top, env(safe-area-inset-top, 4px))) 4px max(4px, var(--tg-safe-bottom, env(safe-area-inset-bottom, 4px))) 4px;
+  /* Safe-area padding is now on .screen — .app just adds a small inner
+     gutter so the canvas + meters don't touch the screen edges. */
+  padding: 4px;
   gap: 3px;
   position: relative;
   overflow: hidden;
@@ -412,6 +414,15 @@ canvas {
 #boardWrap {
   position: relative;
   margin-top: 6px;
+  /* Expand to fill all the leftover vertical space between meters and
+     the energy bar. sizeCanvas() reads our actual rect and computes
+     CELL from it, so canvas never overflows. */
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .float-layer {
   position: absolute;
@@ -693,7 +704,14 @@ canvas {
    ========================================================= */
 .screen {
   position: absolute; inset: 0;
-  padding-bottom: 50px; /* room for bottom nav */
+  /* Reserve safe-area-top for Telegram's controls / device notch,
+     and safe-area-bottom + 50px for the bottom-nav (which is
+     absolute-positioned at bottom: safe-area-bottom). Without these
+     paddings the screen content rendered BEHIND TG's top controls
+     AND under the bottom-nav, creating the "pushed up" effect on
+     every tab. */
+  padding-top: var(--tg-safe-top, 0px);
+  padding-bottom: calc(50px + var(--tg-safe-bottom, 0px));
   display: none;
   flex-direction: column;
   overflow: hidden;
@@ -2614,13 +2632,20 @@ function tick(t) {
 }
 
 function sizeCanvas() {
-  // Reserve vertical room for HUD + bottom nav. The canvas should be the
-  // largest possible square fitting horizontally within the screen.
-  const maxW = Math.min(window.innerWidth - 12, 460);
-  // HUD: versus row ~64 + meter row ~36 + last-match ~16 + energy ~38 +
-  // action bar ~46 + bottom nav 50 + safe-area + paddings ~10 = ~260
-  const maxH = window.innerHeight - 280;
-  CELL = Math.max(36, Math.floor(Math.min(maxW / COLS, maxH / ROWS)));
+  // Size from the actual #boardWrap rect after layout — gives the canvas
+  // exactly the space the flex container reserved for it. Falls back to
+  // a window-based estimate when called before layout (rect is 0).
+  const wrap = document.getElementById('boardWrap');
+  let maxW = Math.min(window.innerWidth - 12, 460);
+  let maxH = window.innerHeight - 280;
+  if (wrap) {
+    const wr = wrap.getBoundingClientRect();
+    if (wr.width >= 100 && wr.height >= 100) {
+      maxW = Math.min(wr.width - 6, 460);
+      maxH = wr.height - 6;
+    }
+  }
+  CELL = Math.max(34, Math.floor(Math.min(maxW / COLS, maxH / ROWS)));
   DPR = Math.min(2, window.devicePixelRatio || 1);
   canvas.style.width  = (CELL * COLS) + 'px';
   canvas.style.height = (CELL * ROWS) + 'px';
@@ -2629,6 +2654,13 @@ function sizeCanvas() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   if (CELL > 0 && CELL !== emojiCacheCell) rebuildEmojiCache(CELL);
   render();
+}
+// Auto-resize the canvas whenever the board wrap changes size — handles
+// orientation flips, keyboard appearance, Telegram WebView re-layout etc.
+if (typeof ResizeObserver !== 'undefined') {
+  const _ro = new ResizeObserver(() => sizeCanvas());
+  const _bw = document.getElementById('boardWrap');
+  if (_bw) _ro.observe(_bw);
 }
 
 function rebuildEmojiCache(cell) {
