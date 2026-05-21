@@ -2938,6 +2938,11 @@ function applyTileDataURLToDOM(key) {
   }
 }
 
+// Shared kawaii outline color. Declared BEFORE buildKawaiiTileDataURLs
+// so the drawer functions (which use it) can be called at boot without
+// hitting the TDZ for this const.
+const KAWAII_INK = '#3a1a05';
+
 // Bake the kawaii tile drawings into dataURLs ONCE at boot. The
 // rebuildEmojiCache loop draws them again on the game board canvas
 // per cell-size, but DOM <img> elements (energy bolt, meter thumbs)
@@ -3836,7 +3841,8 @@ function rebuildEmojiCache(cell) {
 // gradient fill, glossy white smear highlight on upper-left. Each
 // function draws ONE tile centered at (cx, cy) inside a size-wide
 // square. Called from rebuildEmojiCache; never per-frame.
-const KAWAII_INK = '#3a1a05';
+// (KAWAII_INK declared earlier in the file so buildKawaiiTileDataURLs
+// at boot can call these drawers before reaching this line.)
 
 function drawTileKawaiiCoin(c, cx, cy, size) {
   const r = size * 0.48;
