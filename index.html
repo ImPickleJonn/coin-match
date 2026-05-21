@@ -2148,10 +2148,14 @@ function tgReady() {
     if (TG.disableVerticalSwipes) try { TG.disableVerticalSwipes(); } catch (e) {}
     if (TG.lockOrientation) try { TG.lockOrientation(); } catch (e) {}
     applySafeArea();
+    // Telegram lands the safe-area numbers asynchronously after
+    // requestFullscreen() — re-sync once after a tick to catch them.
+    setTimeout(applySafeArea, 400);
     if (TG.onEvent) {
-      TG.onEvent('viewportChanged', applySafeArea);
-      TG.onEvent('safeAreaChanged', applySafeArea);
-      TG.onEvent('contentSafeAreaChanged', applySafeArea);
+      TG.onEvent('viewportChanged',         applySafeArea);
+      TG.onEvent('safeAreaChanged',         applySafeArea);
+      TG.onEvent('contentSafeAreaChanged',  applySafeArea);
+      try { TG.onEvent('fullscreenChanged', applySafeArea); } catch (e) {}
     }
     if (state.lang === 'en' && TG.initDataUnsafe && TG.initDataUnsafe.user && TG.initDataUnsafe.user.language_code) {
       const lc = String(TG.initDataUnsafe.user.language_code).slice(0, 2).toLowerCase();
@@ -2164,12 +2168,30 @@ function tgReady() {
     }
   } catch (e) {}
 }
+// Ported from Match Icon's syncTgSafeArea — the older simpler version
+// (one OR'd source) returned 0 on plenty of TG clients, leaving content
+// to render under TG's "Close 53m ..." overlay chrome. We now:
+//   1. Read BOTH contentSafeAreaInset and safeAreaInset (max of them).
+//   2. Apply a platform-specific minimum so the WebApp always clears
+//      TG's overlay chrome even when the client reports 0.
+//   3. Re-sync on contentSafeAreaChanged / safeAreaChanged / fullscreen-
+//      Changed / viewportChanged events.
+//   4. setTimeout 400ms re-sync to catch fullscreen state arriving async.
 function applySafeArea() {
   if (!TG) return;
-  const csi = TG.contentSafeAreaInset || TG.safeAreaInset || {};
-  const top = Math.max(0, csi.top || 0);
-  const bottom = Math.max(0, csi.bottom || 0);
-  document.documentElement.style.setProperty('--tg-safe-top', top + 'px');
+  const platform = (TG.platform || '').toLowerCase();
+  const isAndroid = platform === 'android';
+  const content = TG.contentSafeAreaInset || {};
+  const safe    = TG.safeAreaInset || {};
+  const reportedTop    = Math.max(content.top    || 0, safe.top    || 0);
+  const reportedBottom = Math.max(content.bottom || 0, safe.bottom || 0);
+  // iOS: Dynamic Island + TG overlay header ~ 100px. Android: just the
+  // TG chrome ~ 24px. These are the floors — if TG reports more, use that.
+  const minTop    = isAndroid ? 24 : 100;
+  const minBottom = isAndroid ? 16 : 36;
+  const top    = Math.max(reportedTop,    minTop);
+  const bottom = Math.max(reportedBottom, minBottom);
+  document.documentElement.style.setProperty('--tg-safe-top',    top    + 'px');
   document.documentElement.style.setProperty('--tg-safe-bottom', bottom + 'px');
   sizeCanvas();
 }
