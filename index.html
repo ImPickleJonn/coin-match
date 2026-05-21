@@ -83,6 +83,10 @@ html, body {
   gap: 3px;
   position: relative;
   overflow: hidden;
+  /* Center the whole HUD+grid stack vertically so leftover space is
+     distributed equally above versus and below energy — content
+     "drops down" into the middle instead of packing at the top. */
+  justify-content: center;
 }
 .app::before {
   content: '';
@@ -2036,10 +2040,6 @@ body.theme-matryoshka .theme-cell.active {
       <div class="energy-timer" id="energy-timer"></div>
       <div class="bet-btn" id="bet-btn"><span data-i18n="bet">BET</span><span class="x" id="bet-x">×1</span></div>
     </div>
-
-    <!-- Absorbs leftover vertical space so the energy bar isn't flush
-         with the nav. Content above stacks tight (meter→grid). -->
-    <div class="app-spacer"></div>
 
   </div>
 </div>
