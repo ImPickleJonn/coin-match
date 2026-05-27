@@ -310,6 +310,34 @@ const TILES = [
     filename: '62_splash_bg.png',
     subject: `A bright kawaii background scene: sunshine yellow sky with soft white fluffy clouds, scattered floating gold coins and sparkle stars, a rolling green hill at the bottom with grass and some small candy-colored flowers (pink, blue, purple). NO characters, NO text — just an atmospheric kawaii scene that the game's logo will sit on top of. Bright, cheerful, like the Merge Plop splash screen feel but without the central subject.`,
   },
+
+  // FULL-SCREEN SPLASH HERO IMAGE (9:16 portrait, fills the phone)
+  {
+    id: 'splash_hero',
+    filename: '63_splash_hero.png',
+    aspectRatio: '9:16',
+    imageSize: '2K',
+    skipPostProcess: true,    // full-bleed scene — keep its background intact
+    subject: `A complete mobile game splash screen — FULL-BLEED PAINTED SCENE, NOT a sticker on a flat color. Portrait 9:16. The entire canvas is filled with a kawaii ILLUSTRATED ENVIRONMENT.
+
+  THE BACKGROUND IS THE WHOLE POINT. The canvas MUST be filled edge-to-edge with this painted scene:
+  - Top 40% of canvas: BRIGHT WARM YELLOW SKY (sunshine yellow #ffd84a fading down through peach to soft orange-pink at the horizon). Scattered FLUFFY WHITE CARTOON CLOUDS. A few sparkle stars and tiny floating gold coins drifting in the sky. The sky must be fully painted — every single pixel of the top of the canvas is yellow sky, NOT BLACK and NOT WHITE.
+  - Middle 30%: rolling soft GREEN GRASSY HILLS in the background, with scattered candy-colored flowers (pink, purple, blue, yellow). Small wooden treasure chests and purple money sacks resting on the grass.
+  - Bottom 30%: a wider patch of bright kelly-green grass in the foreground with more flowers, fallen gold coins, sparkle stars.
+
+  OVERLAID ON TOP OF THIS SCENE (do not omit any of these):
+  - In the UPPER-CENTER portion of the canvas: a CHUNKY KAWAII BUBBLE-LETTER GAME LOGO that reads "COIN MATCH" on TWO lines — "COIN" in bright golden-yellow balloon-letter text on top, "MATCH" in candy-pink balloon-letter text below. Each letter has thick chocolate-brown outline, glossy white highlight on the upper-left, slight playful tilt. A small winking gold-coin character mascot peeks from beside the logo.
+  - In the LOWER-CENTER portion (on the grass): TWO HERO CHARACTERS standing side-by-side — LEFT is a chubby pink cartoon pig wearing a black pirate hat with white skull emblem (dollar-sign "$" eyes, happy smile, pink cheek blush), RIGHT is a chubby green baby dragon with a small gold crown and folded wings (dollar-sign "$" eyes, happy smile, pink blush, tiny fang).
+
+  STYLE EVERYWHERE:
+  - Chunky chocolate-brown outlines on every silhouette
+  - Glossy candy gradients on every fill
+  - Bright saturated palette (yellow/pink/green/purple/blue/gold)
+  - Match the Merge Plop splash reference image's exact illustration style
+  - NO HUD, NO BUTTONS, NO LOADING BAR, NO TEXT EXCEPT THE LOGO
+
+  CRITICAL: The background MUST be the painted yellow-sky-and-green-grass scene. NOT black. NOT white. NOT transparent. NOT a flat color. A REAL ILLUSTRATED SCENE that fills 100% of the canvas.`,
+  },
 ];
 
 // ----- Decode any incoming image to RGBA pixel data + width/height.
@@ -512,7 +540,10 @@ async function generateTile(tile, referenceImg) {
     }],
     generationConfig: {
       responseModalities: ['IMAGE'],
-      imageConfig: { aspectRatio: '1:1', imageSize: '1K' },
+      imageConfig: {
+        aspectRatio: tile.aspectRatio || '1:1',
+        imageSize:   tile.imageSize   || '1K',
+      },
     },
   };
 
@@ -571,13 +602,25 @@ async function main() {
       const out = path.join(outDir, tile.filename);
       const sig = rawImg.slice(0, 4).toString('hex');
       let saved;
-      try {
-        // decodeToRGBA handles both PNG and JPEG. stripBlackBackground
-        // chroma-keys and returns a fresh PNG with proper alpha.
-        saved = stripBlackBackground(rawImg);
-      } catch (e) {
-        console.log(`  (chroma-key failed sig=${sig} mime=${mime}: ${e.message}; saving raw)`);
-        saved = rawImg;
+      if (tile.skipPostProcess) {
+        // Full-bleed art (e.g. the splash hero): keep the original
+        // background intact. Just re-encode to PNG if it came as JPEG.
+        try {
+          const decoded = decodeToRGBA(rawImg);
+          saved = encodeRGBAToPNG(decoded.width, decoded.height, decoded.data);
+        } catch (e) {
+          console.log(`  (decode failed: ${e.message}; saving raw)`);
+          saved = rawImg;
+        }
+      } else {
+        try {
+          // decodeToRGBA handles both PNG and JPEG. stripBlackBackground
+          // chroma-keys and returns a fresh PNG with proper alpha.
+          saved = stripBlackBackground(rawImg);
+        } catch (e) {
+          console.log(`  (chroma-key failed sig=${sig} mime=${mime}: ${e.message}; saving raw)`);
+          saved = rawImg;
+        }
       }
       fs.writeFileSync(out, saved);
       const ms = Date.now() - t0;
