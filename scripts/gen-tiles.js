@@ -45,19 +45,27 @@ const MODEL = 'gemini-3-pro-image-preview';   // Nano Banana Pro
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
 // ----- Reference image (Merge Plop splash, sets the style anchor) -----
-const REFERENCE_IMAGE = path.join(
-  process.env.USERPROFILE || process.env.HOME || '',
-  'Desktop',
-  'Merge Plop Splash Screen.png'
-);
+// Try several locations — the splash file gets renamed / moved sometimes.
+const REFERENCE_CANDIDATES = [
+  path.join(process.env.USERPROFILE || process.env.HOME || '', 'Desktop', 'Merge Plop Splash Screen.png'),
+  path.join(process.env.USERPROFILE || process.env.HOME || '', 'Desktop', 'plop.png'),
+  path.join(process.env.USERPROFILE || process.env.HOME || '', 'Desktop', 'merge-blast-project', 'assets', 'splash.jpg'),
+  path.join(process.env.USERPROFILE || process.env.HOME || '', 'Desktop', 'merge-plop-roguelite-project', 'assets', 'splash.jpg'),
+];
 
 function loadReferenceBase64() {
-  if (!fs.existsSync(REFERENCE_IMAGE)) {
-    console.error('ERROR: Reference image not found at', REFERENCE_IMAGE);
-    process.exit(1);
+  for (const p of REFERENCE_CANDIDATES) {
+    if (fs.existsSync(p)) {
+      const buf = fs.readFileSync(p);
+      const mime = p.toLowerCase().endsWith('.jpg') || p.toLowerCase().endsWith('.jpeg')
+        ? 'image/jpeg' : 'image/png';
+      console.log('Using reference: ' + p);
+      return { mime, data: buf.toString('base64'), path: p };
+    }
   }
-  const buf = fs.readFileSync(REFERENCE_IMAGE);
-  return { mime: 'image/png', data: buf.toString('base64') };
+  console.error('ERROR: No reference image found. Tried:');
+  for (const p of REFERENCE_CANDIDATES) console.error('  ' + p);
+  process.exit(1);
 }
 
 // ----- Shared style preamble (the anchor that keeps all 7 tiles consistent) -----
@@ -191,6 +199,74 @@ const TILES = [
     id: 'nav_friends',
     filename: '24_nav_friends.png',
     subject: `Two cute cartoon character heads side-by-side, slightly overlapping (the back one half-hidden by the front one). Front character: round pink head with a smile. Back character: round blue head with a smile. Simple, no facial details beyond a small smile and dot eyes. Chunky kawaii proportions.`,
+  },
+
+  // ===== AVATARS — player + 5 master templates =====
+  {
+    id: 'avatar_player',
+    filename: '31_avatar_player.png',
+    subject: `A cute generic round cartoon-mascot HEAD only (no body). Cream/peach skin tone, simple smiley face: two dot eyes with shine, a small smile, pink cheek blush. Slight upward tuft of brown hair on top of the head. Chunky kawaii proportions — head fills most of the canvas.`,
+  },
+  {
+    id: 'avatar_master_pirate',
+    filename: '32_avatar_master_pirate.png',
+    subject: `A cute cartoon PIRATE character head (no body). Cream skin, eye patch on one eye, the other eye is a big black dot with a white shine. Black pirate bandana on top of the head with a small white skull-and-crossbones emblem in the front. Small smile, pink cheek blush.`,
+  },
+  {
+    id: 'avatar_master_witch',
+    filename: '33_avatar_master_witch.png',
+    subject: `A cute cartoon WITCH character head (no body). Pale lavender skin, two big purple/violet eyes with white shine highlights, a small smirky smile, pink cheek blush. A pointy black-purple witch hat on top of the head with a yellow star band. Wisps of black hair peeking out from under the hat.`,
+  },
+  {
+    id: 'avatar_master_chef',
+    filename: '34_avatar_master_chef.png',
+    subject: `A cute cartoon CHEF character head (no body). Cream skin, big rosy cheeks, smiley face with two dot eyes and a wide grin showing a tooth. A tall white puffy chef's hat (toque) on top of the head, with a small red kerchief tied around the neck just visible at the bottom edge.`,
+  },
+  {
+    id: 'avatar_master_robot',
+    filename: '35_avatar_master_robot.png',
+    subject: `A cute cartoon ROBOT character head (no body). Shiny metallic silver-blue rounded square head with thick brown outline, two round bright cyan/blue glowing eyes, a small horizontal mouth slot, and a tiny red antenna with a glowing yellow bulb on top. Friendly not threatening.`,
+  },
+  {
+    id: 'avatar_master_king',
+    filename: '36_avatar_master_king.png',
+    subject: `A cute cartoon KING character head (no body). Cream skin, large bushy white beard covering the lower half of the face, two big eyes with white shine highlights, pink cheek blush. A bright gold crown on top of the head with three triangular points and a red gem in the center point.`,
+  },
+
+  // ===== HERO CHARACTERS for the village tab =====
+  {
+    id: 'character_pig',
+    filename: '41_character_pig.png',
+    subject: `Captain Piggy: a cute round chubby cartoon pig wearing a pirate hat with a skull emblem. Pink round body, floppy ears, a darker pink snout with two nostrils, two big dollar-sign "$" eyes (the iris is a $ shape, not a regular pupil), pink rosy cheek blush, and a happy open-mouth smile. A black pirate tricorn hat with a white skull-and-crossbones emblem on top of the head. Body and head merged into one chubby blob.`,
+  },
+  {
+    id: 'character_dragon',
+    filename: '42_character_dragon.png',
+    subject: `Baby Drake: a cute chubby cartoon baby dragon. Green round body with a lighter green belly patch, small folded wings on the back (not spread), tiny back spikes, a small snout with two nostrils, two big "$" dollar-sign eyes (iris is $ shape), pink rosy cheek blush, a happy open-mouth smile with two tiny white fangs visible. A small gold crown on top of the head with three little points.`,
+  },
+
+  // ===== EXTRA UI =====
+  {
+    id: 'settings_gear',
+    filename: '51_settings_gear.png',
+    subject: `A cute cartoon settings gear/cog icon. Bright orange-yellow gradient body with 8 chunky teeth around the perimeter, a round center hole. Glossy white highlight on the upper-left tooth area. Chunky friendly toon proportions, not industrial.`,
+  },
+  {
+    id: 'daily_gift',
+    filename: '52_daily_gift.png',
+    subject: `A cute cartoon wrapped gift box. Bright pink/red square box with a chunky golden-yellow ribbon and a big bow on top. Glossy white highlight on the upper-left face of the box.`,
+  },
+
+  // ===== SPLASH SCREEN =====
+  {
+    id: 'logo',
+    filename: '61_logo.png',
+    subject: `Game logo text "COIN MATCH" in chunky kawaii bubble lettering. Each letter is a thick rounded balloon-letter shape with thick chocolate-brown outline, glossy white highlight on the upper-left of each letter. "COIN" in bright golden yellow, "MATCH" in candy-pink. The text is on TWO LINES with "COIN" on top and "MATCH" below, slightly tilted/playful arrangement. Small gold coin character decoration peeking from the side. Square 1024x1024 canvas with the logo centered.`,
+  },
+  {
+    id: 'splash_bg',
+    filename: '62_splash_bg.png',
+    subject: `A bright kawaii background scene: sunshine yellow sky with soft white fluffy clouds, scattered floating gold coins and sparkle stars, a rolling green hill at the bottom with grass and some small candy-colored flowers (pink, blue, purple). NO characters, NO text — just an atmospheric kawaii scene that the game's logo will sit on top of. Bright, cheerful, like the Merge Plop splash screen feel but without the central subject.`,
   },
 ];
 
@@ -435,7 +511,7 @@ async function main() {
   fs.mkdirSync(outDir, { recursive: true });
 
   const referenceImg = loadReferenceBase64();
-  console.log(`Reference loaded: ${REFERENCE_IMAGE} (${(referenceImg.data.length / 1024).toFixed(0)} KB base64)`);
+  console.log(`Reference loaded: ${referenceImg.path} (${(referenceImg.data.length / 1024).toFixed(0)} KB base64)`);
   console.log(`Model: ${MODEL}`);
   console.log(`Output: ${outDir}\n`);
 
