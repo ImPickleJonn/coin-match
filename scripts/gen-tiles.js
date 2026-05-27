@@ -247,6 +247,11 @@ const TILES = [
 
   // ===== EXTRA UI =====
   {
+    id: 'auto_finger',
+    filename: '53_auto_finger.png',
+    subject: `A cute cartoon kawaii hand cursor / finger pointer. A chunky cream-skin hand silhouette in 3/4 view with the INDEX FINGER POINTING UP-LEFT (toward the 10 o'clock direction, like tapping a phone screen) and the other fingers curled into the palm with a thumb tucked alongside. Chunky chocolate-brown outline on every contour, glossy white highlight on the upper-left of the palm and finger. A simple white shirt cuff at the wrist. NO arm, no background, just the floating hand. Pure kawaii toon style matching the Merge Plop reference.`,
+  },
+  {
     id: 'settings_gear',
     filename: '51_settings_gear.png',
     subject: `A cute cartoon settings gear/cog icon. Bright orange-yellow gradient body with 8 chunky teeth around the perimeter, a round center hole. Glossy white highlight on the upper-left tooth area. Chunky friendly toon proportions, not industrial.`,
