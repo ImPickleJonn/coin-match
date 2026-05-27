@@ -101,7 +101,7 @@ body[data-tg-platform="desktop"] #admin-btn {
   z-index: 500;
   background:
     radial-gradient(ellipse at top, #fff5a8 0%, #ffd84a 55%, #ff9e5e 100%),
-    url('/assets/tiles/62_splash_bg.png?v=24') center center / cover no-repeat;
+    url('/assets/tiles/62_splash_bg.png?v=25') center center / cover no-repeat;
   background-blend-mode: multiply;
   display: flex;
   flex-direction: column;
@@ -2260,7 +2260,7 @@ body.theme-matryoshka .coin-fx-canvas {
      few ticks after boot to reveal the play screen. -->
 <div id="splash" class="splash">
   <div class="splash-logo-wrap">
-    <img class="splash-logo" src="/assets/tiles/61_logo.png?v=24" alt="Coin Match">
+    <img class="splash-logo" src="/assets/tiles/61_logo.png?v=25" alt="Coin Match">
   </div>
   <div class="splash-bar"><div class="splash-bar-fill" id="splash-bar-fill"></div></div>
   <div class="splash-tag">Made with 💖 for matchers</div>
@@ -2287,14 +2287,14 @@ body.theme-matryoshka .coin-fx-canvas {
          2.5px brown border, 3px hard drop-shadow. -->
     <div class="topbar">
       <button class="avatar-pill" id="playerAv" title="Settings">
-        <img id="playerAvImg" src="/assets/tiles/31_avatar_player.png?v=24" alt="">
+        <img id="playerAvImg" src="/assets/tiles/31_avatar_player.png?v=25" alt="">
       </button>
       <div class="pill gold-pill" id="gold-pill" title="Gold">
-        <img class="pill-ico" src="/assets/tiles/01_coin.png?v=24" alt="">
+        <img class="pill-ico" src="/assets/tiles/01_coin.png?v=25" alt="">
         <span class="num" id="goldScore">0</span>
       </div>
       <div class="pill gems-pill" id="gems-pill" title="Gems">
-        <img class="pill-ico" src="/assets/tiles/09_tile_star.png?v=24" alt="">
+        <img class="pill-ico" src="/assets/tiles/09_tile_star.png?v=25" alt="">
         <span class="num" id="gems-count">0</span>
       </div>
     </div>
@@ -3235,6 +3235,45 @@ const UI_ART = {
   _u_logo:      '/assets/tiles/61_logo.png',
   _u_splash_bg: '/assets/tiles/62_splash_bg.png',
 };
+// Special-tile art (4 specials × 4 colors). Each tile type maps to one
+// of {gold, purple, blue, red} via SPECIAL_COLOR_FOR_TILE, then the
+// special's prefix joins to form a key like '_s_arrow_h_gold'.
+const SPECIAL_ART = {
+  _s_arrow_h_gold:   '/assets/tiles/71_sp_arrow_h_gold.png',
+  _s_arrow_h_purple: '/assets/tiles/72_sp_arrow_h_purple.png',
+  _s_arrow_h_blue:   '/assets/tiles/73_sp_arrow_h_blue.png',
+  _s_arrow_h_red:    '/assets/tiles/74_sp_arrow_h_red.png',
+  _s_arrow_v_gold:   '/assets/tiles/75_sp_arrow_v_gold.png',
+  _s_arrow_v_purple: '/assets/tiles/76_sp_arrow_v_purple.png',
+  _s_arrow_v_blue:   '/assets/tiles/77_sp_arrow_v_blue.png',
+  _s_arrow_v_red:    '/assets/tiles/78_sp_arrow_v_red.png',
+  _s_bomb_gold:      '/assets/tiles/81_sp_bomb_gold.png',
+  _s_bomb_purple:    '/assets/tiles/82_sp_bomb_purple.png',
+  _s_bomb_blue:      '/assets/tiles/83_sp_bomb_blue.png',
+  _s_bomb_red:       '/assets/tiles/84_sp_bomb_red.png',
+  _s_lightning_gold: '/assets/tiles/91_sp_lightning_gold.png',
+  _s_lightning_purple: '/assets/tiles/92_sp_lightning_purple.png',
+  _s_lightning_blue: '/assets/tiles/93_sp_lightning_blue.png',
+  _s_lightning_red:  '/assets/tiles/94_sp_lightning_red.png',
+};
+// Per-tile-type color family for specials.
+// We have 7 tile types but only 4 color variants; close-color tiles share.
+function specialColorFor(tileType) {
+  if (tileType === TILE.SACK)   return 'purple';
+  if (tileType === TILE.BOLT || tileType === TILE.SHIELD) return 'blue';
+  if (tileType === TILE.THEME)  return 'red';     // attack glove
+  // COIN, CHEST, PIG (chicken cream → falls back to gold), WILD, STAR
+  return 'gold';
+}
+function specialArtKey(sp, tileType) {
+  const color = specialColorFor(tileType);
+  if (sp === 'ARROW_H')   return '_s_arrow_h_'   + color;
+  if (sp === 'ARROW_V')   return '_s_arrow_v_'   + color;
+  if (sp === 'BOMB')      return '_s_bomb_'      + color;
+  if (sp === 'LIGHTNING') return '_s_lightning_' + color;
+  return null;
+}
+
 // Pool of master avatar keys — bot bots hash to one of these.
 const MASTER_AVATAR_POOL = [
   '_u_master_pirate', '_u_master_witch', '_u_master_chef',
@@ -3389,8 +3428,8 @@ buildKawaiiTileDataURLs();
 // PNG dataURL. On failure (offline preview, asset missing) the boot
 // fallback stays in place.
 function loadKawaiiPNGs() {
-  const ASSET_VERSION = 23;        // bump per regeneration to break browser cache
-  const sources = Object.assign({}, TILE_ART, UI_ART);
+  const ASSET_VERSION = 25;        // bump per regeneration to break browser cache
+  const sources = Object.assign({}, TILE_ART, UI_ART, SPECIAL_ART);
   for (const key in sources) {
     const img = new Image();
     img.onload = () => {
@@ -5913,6 +5952,22 @@ function drawBoltShine(cx, cy, size, t, alpha) {
 function drawSpecialTile(cx, cy, r, cell, alpha) {
   const pulse = 0.88 + 0.12 * Math.sin(now() / 220);
   const tileR = r * 1.08 * pulse;
+
+  // PNG path: if the kawaii special art is loaded for this (sp, type)
+  // combination, blit it and skip the canvas-drawn plate + icon. The
+  // PNG already has the colored plate + glossy highlight + chunky
+  // outline + special icon baked in, so it's a single drawImage.
+  const spArtKey = specialArtKey(cell.sp, cell.type);
+  const spEntry = spArtKey && tileImages[spArtKey];
+  if (spEntry && spEntry.isPng && spEntry.canvas) {
+    const size = tileR * 2.0;
+    if (alpha !== 1) ctx.globalAlpha = alpha;
+    ctx.drawImage(spEntry.canvas, cx - size / 2, cy - size / 2, size, size);
+    if (alpha !== 1) ctx.globalAlpha = 1;
+    return;
+  }
+
+  // ===== Canvas-drawn fallback (kept for offline / asset-missing cases) =====
   const color = tileParticleColor(cell.type);
 
   // Drop shadow
@@ -8416,7 +8471,7 @@ function iconImg(key, size) {
   const src = (typeof TILE_ART !== 'undefined' && TILE_ART[key])
     || (typeof UI_ART !== 'undefined' && UI_ART[key]) || '';
   if (!src) return '';
-  return '<img src="' + src + '?v=24" class="inline-ico" style="width:' + size + 'px;height:' + size + 'px;" alt="">';
+  return '<img src="' + src + '?v=25" class="inline-ico" style="width:' + size + 'px;height:' + size + 'px;" alt="">';
 }
 const coinIcon  = (sz) => iconImg('_t_coin',  sz);
 const boltIcon  = (sz) => iconImg('_t_bolt',  sz);
@@ -8525,7 +8580,7 @@ function refreshMasterBlock() {
                : (typeof ms.idx === 'number' ? ms.idx : 0);
   const avKey = masterAvatarKeyForBot(botIdx);
   const avImg = document.getElementById('masterAvImg');
-  if (avImg && UI_ART[avKey]) avImg.src = UI_ART[avKey] + '?v=24';
+  if (avImg && UI_ART[avKey]) avImg.src = UI_ART[avKey] + '?v=25';
   nameEl.textContent = ms.bot.name.toUpperCase();
   const pileEl = document.getElementById('masterPile');
   if (pileEl) pileEl.textContent = fmtNum(ms.pile);
@@ -8754,7 +8809,7 @@ function doSmash(masterId, idx, el) {
   // ANIMATED HAMMER — drops in from above, rotates into impact pose.
   // Uses the kawaii hammer PNG instead of emoji 🔨.
   const hammer = document.createElement('img');
-  hammer.src = (UI_ART._u_hammer || '/assets/tiles/11_booster_hammer.png') + '?v=24';
+  hammer.src = (UI_ART._u_hammer || '/assets/tiles/11_booster_hammer.png') + '?v=25';
   hammer.style.cssText =
     'position:fixed;left:' + impactX + 'px;top:' + (impactY - 220) + 'px;' +
     'width:120px;height:120px;object-fit:contain;' +

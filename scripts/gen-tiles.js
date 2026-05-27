@@ -257,6 +257,48 @@ const TILES = [
     subject: `A cute cartoon wrapped gift box. Bright pink/red square box with a chunky golden-yellow ribbon and a big bow on top. Glossy white highlight on the upper-left face of the box.`,
   },
 
+  // ===== SPECIAL TILES — 4 specials × 4 color families. Each one is
+  // a chunky kawaii tile (rounded square plate) in the indicated color
+  // with the special's icon (arrow / bomb / lightning) overlaid in white
+  // with a chocolate-brown outline. They replace the canvas-drawn
+  // specials previously rendered via drawSpecialTile. =====
+  // --- HORIZONTAL ARROW (formed by 4-in-a-row match) ---
+  { id: 'sp_arrow_h_gold',   filename: '71_sp_arrow_h_gold.png',
+    subject: `A chunky kawaii rounded-square game tile in bright golden YELLOW (matching a gold coin). On its front face is a bold double-headed horizontal arrow ↔ (arrow points on both left and right ends) in WHITE with a thick chocolate-brown outline. The tile itself has the chunky chocolate-brown contour, glossy white highlight on the upper-left, and the same candy-toon style as the rest of the match-3 game's icons.` },
+  { id: 'sp_arrow_h_purple', filename: '72_sp_arrow_h_purple.png',
+    subject: `A chunky kawaii rounded-square game tile in deep candy PURPLE (matching a purple money sack). On its front face is a bold double-headed horizontal arrow ↔ (arrow points on both left and right ends) in WHITE with a thick chocolate-brown outline. The tile itself has the chunky chocolate-brown contour, glossy white highlight on the upper-left, and the same candy-toon style as the rest of the match-3 game's icons.` },
+  { id: 'sp_arrow_h_blue',   filename: '73_sp_arrow_h_blue.png',
+    subject: `A chunky kawaii rounded-square game tile in bright SKY-BLUE (matching a blue lightning bolt). On its front face is a bold double-headed horizontal arrow ↔ (arrow points on both left and right ends) in WHITE with a thick chocolate-brown outline. The tile itself has the chunky chocolate-brown contour, glossy white highlight on the upper-left, and the same candy-toon style as the rest of the match-3 game's icons.` },
+  { id: 'sp_arrow_h_red',    filename: '74_sp_arrow_h_red.png',
+    subject: `A chunky kawaii rounded-square game tile in bright candy RED-PINK (matching a red boxing glove). On its front face is a bold double-headed horizontal arrow ↔ (arrow points on both left and right ends) in WHITE with a thick chocolate-brown outline. The tile itself has the chunky chocolate-brown contour, glossy white highlight on the upper-left, and the same candy-toon style as the rest of the match-3 game's icons.` },
+  // --- VERTICAL ARROW (formed by 4-in-a-column match) ---
+  { id: 'sp_arrow_v_gold',   filename: '75_sp_arrow_v_gold.png',
+    subject: `A chunky kawaii rounded-square game tile in bright golden YELLOW. On its front face is a bold double-headed vertical arrow ↕ (arrow points on both top and bottom ends) in WHITE with a thick chocolate-brown outline. The tile itself has the chunky chocolate-brown contour, glossy white highlight on the upper-left, and the same candy-toon style as the rest of the match-3 game's icons.` },
+  { id: 'sp_arrow_v_purple', filename: '76_sp_arrow_v_purple.png',
+    subject: `A chunky kawaii rounded-square game tile in deep candy PURPLE. On its front face is a bold double-headed vertical arrow ↕ (arrow points on both top and bottom ends) in WHITE with a thick chocolate-brown outline. The tile itself has the chunky chocolate-brown contour, glossy white highlight on the upper-left, and the same candy-toon style as the rest of the match-3 game's icons.` },
+  { id: 'sp_arrow_v_blue',   filename: '77_sp_arrow_v_blue.png',
+    subject: `A chunky kawaii rounded-square game tile in bright SKY-BLUE. On its front face is a bold double-headed vertical arrow ↕ (arrow points on both top and bottom ends) in WHITE with a thick chocolate-brown outline. The tile itself has the chunky chocolate-brown contour, glossy white highlight on the upper-left, and the same candy-toon style as the rest of the match-3 game's icons.` },
+  { id: 'sp_arrow_v_red',    filename: '78_sp_arrow_v_red.png',
+    subject: `A chunky kawaii rounded-square game tile in bright candy RED-PINK. On its front face is a bold double-headed vertical arrow ↕ (arrow points on both top and bottom ends) in WHITE with a thick chocolate-brown outline. The tile itself has the chunky chocolate-brown contour, glossy white highlight on the upper-left, and the same candy-toon style as the rest of the match-3 game's icons.` },
+  // --- BOMB (formed by T/L match — 3x3 explosion) ---
+  { id: 'sp_bomb_gold',   filename: '81_sp_bomb_gold.png',
+    subject: `A chunky kawaii rounded-square game tile in bright golden YELLOW. On its front face is a cute cartoon BOMB icon (round dark-gray sphere with a small lit fuse and tiny orange spark on top) in WHITE-AND-DARK-GRAY with a thick chocolate-brown outline. The tile itself has the chunky chocolate-brown contour, glossy white highlight on the upper-left, and the same candy-toon style as the rest of the match-3 game's icons.` },
+  { id: 'sp_bomb_purple', filename: '82_sp_bomb_purple.png',
+    subject: `A chunky kawaii rounded-square game tile in deep candy PURPLE. On its front face is a cute cartoon BOMB icon (round dark-gray sphere with a small lit fuse and tiny orange spark on top) in WHITE-AND-DARK-GRAY with a thick chocolate-brown outline. The tile itself has the chunky chocolate-brown contour, glossy white highlight on the upper-left, and the same candy-toon style as the rest of the match-3 game's icons.` },
+  { id: 'sp_bomb_blue',   filename: '83_sp_bomb_blue.png',
+    subject: `A chunky kawaii rounded-square game tile in bright SKY-BLUE. On its front face is a cute cartoon BOMB icon (round dark-gray sphere with a small lit fuse and tiny orange spark on top) in WHITE-AND-DARK-GRAY with a thick chocolate-brown outline. The tile itself has the chunky chocolate-brown contour, glossy white highlight on the upper-left, and the same candy-toon style as the rest of the match-3 game's icons.` },
+  { id: 'sp_bomb_red',    filename: '84_sp_bomb_red.png',
+    subject: `A chunky kawaii rounded-square game tile in bright candy RED-PINK. On its front face is a cute cartoon BOMB icon (round dark-gray sphere with a small lit fuse and tiny orange spark on top) in WHITE-AND-DARK-GRAY with a thick chocolate-brown outline. The tile itself has the chunky chocolate-brown contour, glossy white highlight on the upper-left, and the same candy-toon style as the rest of the match-3 game's icons.` },
+  // --- LIGHTNING (formed by 5-in-a-row match) ---
+  { id: 'sp_lightning_gold',   filename: '91_sp_lightning_gold.png',
+    subject: `A chunky kawaii rounded-square game tile in bright golden YELLOW. On its front face is a bold lightning-bolt zigzag in WHITE with a thick chocolate-brown outline. The tile itself has the chunky chocolate-brown contour, glossy white highlight on the upper-left, and the same candy-toon style as the rest of the match-3 game's icons.` },
+  { id: 'sp_lightning_purple', filename: '92_sp_lightning_purple.png',
+    subject: `A chunky kawaii rounded-square game tile in deep candy PURPLE. On its front face is a bold lightning-bolt zigzag in WHITE with a thick chocolate-brown outline. The tile itself has the chunky chocolate-brown contour, glossy white highlight on the upper-left, and the same candy-toon style as the rest of the match-3 game's icons.` },
+  { id: 'sp_lightning_blue',   filename: '93_sp_lightning_blue.png',
+    subject: `A chunky kawaii rounded-square game tile in bright SKY-BLUE. On its front face is a bold lightning-bolt zigzag in WHITE with a thick chocolate-brown outline. The tile itself has the chunky chocolate-brown contour, glossy white highlight on the upper-left, and the same candy-toon style as the rest of the match-3 game's icons.` },
+  { id: 'sp_lightning_red',    filename: '94_sp_lightning_red.png',
+    subject: `A chunky kawaii rounded-square game tile in bright candy RED-PINK. On its front face is a bold lightning-bolt zigzag in WHITE with a thick chocolate-brown outline. The tile itself has the chunky chocolate-brown contour, glossy white highlight on the upper-left, and the same candy-toon style as the rest of the match-3 game's icons.` },
+
   // ===== SPLASH SCREEN =====
   {
     id: 'logo',
