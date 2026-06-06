@@ -1408,14 +1408,21 @@ async function boot() {
   stage = app.stage;
   stage.sortableChildren = true;
 
-  // 2. Load assets
-  const assetList = Object.entries(ASSET).map(([k, v]) => ({alias: k, src: v}));
-  for (const a of assetList) {
-    try {
-      await PIXI.Assets.load(a);
-      tex[a.alias] = PIXI.Texture.from(a.src);
-    } catch (e) {
-      console.warn('asset load failed:', a, e);
+  // 2. Load assets — bundle API returns a {key:Texture} map, which is
+  //    exactly what tex[] needs. Direct assignment, no second lookup.
+  //    (Previous code awaited load() then Texture.from(src) which gave
+  //    back empty textures because the cache key didn't always match.)
+  try {
+    PIXI.Assets.addBundle('main', ASSET);
+    const loaded = await PIXI.Assets.loadBundle('main');
+    for (const k in loaded) tex[k] = loaded[k];
+    console.log('Pixi loaded', Object.keys(tex).length, 'textures');
+  } catch (e) {
+    console.error('Asset bundle load failed:', e);
+    // Fallback: try each one individually so a single 404 doesn't kill the boot
+    for (const [k, src] of Object.entries(ASSET)) {
+      try { tex[k] = await PIXI.Assets.load(src); }
+      catch (e2) { console.warn('failed:', k, src, e2); }
     }
   }
 
