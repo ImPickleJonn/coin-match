@@ -390,7 +390,23 @@ function makeLabel(str, opts) {
 
 function makeIcon(textureKey, size) {
   const t = tex[textureKey];
-  if (!t) return new PIXI.Container();
+  if (!t) {
+    // VISIBLE DEBUG PLACEHOLDER — magenta square so we can SEE which
+    // textures failed to load. (was: silent empty Container, which
+    // produced invisible icons + a panic.)
+    console.warn('[makeIcon] missing texture:', textureKey);
+    const g = new PIXI.Graphics();
+    const s = size || 30;
+    g.lineStyle(2, 0xff00ff, 1);
+    g.beginFill(0xff00ff, 0.45);
+    g.drawRect(-s/2, -s/2, s, s);
+    g.endFill();
+    // Tiny X mark in center so the placeholder reads as "broken"
+    g.lineStyle(2, 0x000000, 1);
+    g.moveTo(-s/3, -s/3); g.lineTo(s/3, s/3);
+    g.moveTo(-s/3,  s/3); g.lineTo(s/3,-s/3);
+    return g;
+  }
   const s = new PIXI.Sprite(t);
   s.anchor.set(0.5);
   if (size) { s.width = size; s.height = size; }
@@ -1408,22 +1424,27 @@ async function boot() {
   stage = app.stage;
   stage.sortableChildren = true;
 
-  // 2. Load assets — bundle API returns a {key:Texture} map, which is
-  //    exactly what tex[] needs. Direct assignment, no second lookup.
-  //    (Previous code awaited load() then Texture.from(src) which gave
-  //    back empty textures because the cache key didn't always match.)
+  // 2. Load assets — BULLETPROOF STRATEGY:
+  //    (a) Synchronously create every Texture via PIXI.Texture.from(src).
+  //        This gives tex[k] a real Texture object IMMEDIATELY, even before
+  //        the underlying image has loaded. Sprites using these textures
+  //        get a 1×1 placeholder and pop in once the image finishes loading.
+  //    (b) Then await PIXI.Assets.load(urls) so we don't show a half-loaded
+  //        UI on boot.
+  //    This pattern survives even if Assets.load misbehaves — sprites will
+  //    still render once the native HTMLImageElement loads.
+  console.log('[boot] PIXI version:', PIXI.VERSION);
+  console.log('[boot] Creating', Object.keys(ASSET).length, 'texture placeholders');
+  for (const [k, src] of Object.entries(ASSET)) {
+    tex[k] = PIXI.Texture.from(src);
+  }
+  console.log('[boot] tex keys ready:', Object.keys(tex).length);
   try {
-    PIXI.Assets.addBundle('main', ASSET);
-    const loaded = await PIXI.Assets.loadBundle('main');
-    for (const k in loaded) tex[k] = loaded[k];
-    console.log('Pixi loaded', Object.keys(tex).length, 'textures');
+    const urls = Object.values(ASSET);
+    await PIXI.Assets.load(urls);
+    console.log('[boot] preload complete:', urls.length, 'images');
   } catch (e) {
-    console.error('Asset bundle load failed:', e);
-    // Fallback: try each one individually so a single 404 doesn't kill the boot
-    for (const [k, src] of Object.entries(ASSET)) {
-      try { tex[k] = await PIXI.Assets.load(src); }
-      catch (e2) { console.warn('failed:', k, src, e2); }
-    }
+    console.warn('[boot] preload threw (sprites will still load lazily):', e);
   }
 
   // 3. Init grid
