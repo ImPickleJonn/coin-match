@@ -92,24 +92,24 @@ const BETS = [
 
 // Asset paths
 const ASSET = {
-  coin:        '/assets/tiles/01_coin.png',
-  sack:        '/assets/tiles/02_purple_sack_of_coins.png',
-  chest:       '/assets/tiles/03_closed_treasure_chest.png',
-  bolt:        '/assets/tiles/04_blue_energy_bolt.png',
-  pig:         '/assets/tiles/05_chicken_steal_mascot.png',
-  theme:       '/assets/tiles/06_cute_attack_glove.png',
-  shield:      '/assets/tiles/07_shield.png',
-  wild:        '/assets/tiles/08_tile_wild.png',
-  star:        '/assets/tiles/09_tile_star.png',
-  avatar:      '/assets/tiles/31_avatar_player.png',
-  boostHammer: '/assets/tiles/11_booster_hammer.png',
-  boostRocket: '/assets/tiles/12_booster_rocket.png',
-  boostBomb:   '/assets/tiles/13_booster_bomb.png',
-  boostShuffle:'/assets/tiles/14_booster_shuffle.png',
-  navVillage:  '/assets/tiles/21_nav_village.png',
-  navPlay:     '/assets/tiles/22_nav_play.png',
-  navShop:     '/assets/tiles/23_nav_shop.png',
-  navFriends:  '/assets/tiles/24_nav_friends.png',
+  coin:        'assets/tiles/01_coin.png',
+  sack:        'assets/tiles/02_purple_sack_of_coins.png',
+  chest:       'assets/tiles/03_closed_treasure_chest.png',
+  bolt:        'assets/tiles/04_blue_energy_bolt.png',
+  pig:         'assets/tiles/05_chicken_steal_mascot.png',
+  theme:       'assets/tiles/06_cute_attack_glove.png',
+  shield:      'assets/tiles/07_shield.png',
+  wild:        'assets/tiles/08_tile_wild.png',
+  star:        'assets/tiles/09_tile_star.png',
+  avatar:      'assets/tiles/31_avatar_player.png',
+  boostHammer: 'assets/tiles/11_booster_hammer.png',
+  boostRocket: 'assets/tiles/12_booster_rocket.png',
+  boostBomb:   'assets/tiles/13_booster_bomb.png',
+  boostShuffle:'assets/tiles/14_booster_shuffle.png',
+  navVillage:  'assets/tiles/21_nav_village.png',
+  navPlay:     'assets/tiles/22_nav_play.png',
+  navShop:     'assets/tiles/23_nav_shop.png',
+  navFriends:  'assets/tiles/24_nav_friends.png',
 };
 
 // Kawaii palette (Pixi color = number)
@@ -1424,27 +1424,35 @@ async function boot() {
   stage = app.stage;
   stage.sortableChildren = true;
 
-  // 2. Load assets — BULLETPROOF STRATEGY:
-  //    (a) Synchronously create every Texture via PIXI.Texture.from(src).
-  //        This gives tex[k] a real Texture object IMMEDIATELY, even before
-  //        the underlying image has loaded. Sprites using these textures
-  //        get a 1×1 placeholder and pop in once the image finishes loading.
-  //    (b) Then await PIXI.Assets.load(urls) so we don't show a half-loaded
-  //        UI on boot.
-  //    This pattern survives even if Assets.load misbehaves — sprites will
-  //    still render once the native HTMLImageElement loads.
+  // 2. Load assets.
+  //    PIXI.Texture.from(src) creates a Texture immediately (1×1 placeholder
+  //    that auto-updates when the underlying HTMLImageElement loads). Sprites
+  //    built against these textures work on BOTH http:// and file:// origins,
+  //    because <img> tags can load file:// URLs from a file:// page.
+  //
+  //    PIXI.Assets.load() uses fetch() under the hood, which is BLOCKED by
+  //    CORS on file:// origins. So on file://, we skip the fetch preload
+  //    entirely and just wait a short tick for the HTMLImageElement loads.
   console.log('[boot] PIXI version:', PIXI.VERSION);
+  console.log('[boot] protocol:', location.protocol);
   console.log('[boot] Creating', Object.keys(ASSET).length, 'texture placeholders');
   for (const [k, src] of Object.entries(ASSET)) {
     tex[k] = PIXI.Texture.from(src);
   }
   console.log('[boot] tex keys ready:', Object.keys(tex).length);
-  try {
-    const urls = Object.values(ASSET);
-    await PIXI.Assets.load(urls);
-    console.log('[boot] preload complete:', urls.length, 'images');
-  } catch (e) {
-    console.warn('[boot] preload threw (sprites will still load lazily):', e);
+  const onFileProtocol = location.protocol === 'file:';
+  if (onFileProtocol) {
+    console.log('[boot] file:// detected — skipping fetch preload; using <img> loader');
+    // Give the HTMLImageElement loads a head start before we build UI
+    await new Promise(r => setTimeout(r, 350));
+  } else {
+    try {
+      const urls = Object.values(ASSET);
+      await PIXI.Assets.load(urls);
+      console.log('[boot] preload complete:', urls.length, 'images');
+    } catch (e) {
+      console.warn('[boot] preload threw (sprites will still load lazily):', e);
+    }
   }
 
   // 3. Init grid
